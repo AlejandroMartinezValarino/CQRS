@@ -1,0 +1,2 @@
+"""GraphQL del read side."""
+

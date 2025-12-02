@@ -1,0 +1,31 @@
+[Unit]
+Description=CQRS Read Side GraphQL
+After=network.target postgresql.service kafka.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=cqrs
+Group=cqrs
+WorkingDirectory=/opt/cqrs/app
+Environment="PATH=/opt/cqrs/venv/bin"
+EnvironmentFile=/opt/cqrs/app/.env
+ExecStart=/opt/cqrs/venv/bin/uvicorn \
+    app.read_side.graphql.main:app \
+    --host 0.0.0.0 \
+    --port 8001 \
+    --workers 4 \
+    --no-access-log
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cqrs-read
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
