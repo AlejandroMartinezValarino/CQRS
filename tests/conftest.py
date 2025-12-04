@@ -16,6 +16,5 @@ def event_loop():
 @pytest.fixture
 def test_settings():
     """Configuración de prueba."""
-    # Puedes sobrescribir settings para tests aquí
     return settings
 

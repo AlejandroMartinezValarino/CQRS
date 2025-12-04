@@ -6,6 +6,8 @@ from common.dto.command_dto import ClickCommand, ViewCommand, RatingCommand
 from common.utils.logger import get_logger
 from app.command_side.application.anime_command_handler import AnimeCommandHandler
 from config.settings import settings
+from common.exceptions import AnimeNotFoundError, InvalidRatingError, DomainException
+
 
 logger = get_logger(__name__)
 
@@ -17,7 +19,6 @@ app = FastAPI(
     redoc_url="/redoc" if not settings.is_production else None,
 )
 
-# Configurar CORS
 if settings.ALLOWED_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -27,7 +28,6 @@ if settings.ALLOWED_ORIGINS:
         allow_headers=["*"],
     )
 
-# Inicializar handler
 command_handler = AnimeCommandHandler()
 
 
@@ -74,8 +74,11 @@ async def register_click(command: ClickCommand):
         logger.info(f"Registrando click: anime_id={command.anime_id}, user_id={command.user_id}")
         await command_handler.handle_click(command)
         return {"status": "ok", "message": "Click registrado"}
-    except ValueError as e:
-        logger.warning(f"Error de validación en click: {e}")
+    except AnimeNotFoundError as e:
+        logger.warning(f"Anime no encontrado: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except DomainException as e:
+        logger.warning(f"Error de dominio en click: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Error registrando click: {e}", exc_info=True)
@@ -83,7 +86,6 @@ async def register_click(command: ClickCommand):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al registrar click" if settings.is_production else str(e)
         )
-
 
 @app.post("/view", status_code=status.HTTP_201_CREATED)
 async def register_view(command: ViewCommand):
@@ -95,8 +97,11 @@ async def register_view(command: ViewCommand):
         )
         await command_handler.handle_view(command)
         return {"status": "ok", "message": "Visualización registrada"}
-    except ValueError as e:
-        logger.warning(f"Error de validación en view: {e}")
+    except AnimeNotFoundError as e:
+        logger.warning(f"Anime no encontrado: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except DomainException as e:
+        logger.warning(f"Error de dominio en view: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Error registrando view: {e}", exc_info=True)
@@ -116,8 +121,14 @@ async def register_rating(command: RatingCommand):
         )
         await command_handler.handle_rating(command)
         return {"status": "ok", "message": "Calificación registrada"}
-    except ValueError as e:
-        logger.warning(f"Error de validación en rating: {e}")
+    except AnimeNotFoundError as e:
+        logger.warning(f"Anime no encontrado: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except InvalidRatingError as e:
+        logger.warning(f"Calificación inválida: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except DomainException as e:
+        logger.warning(f"Error de dominio en rating: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Error registrando rating: {e}", exc_info=True)

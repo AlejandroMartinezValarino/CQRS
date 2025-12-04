@@ -36,7 +36,6 @@ def test_rating_command():
 
 def test_view_command_validation():
     """Test de validación de ViewCommand."""
-    # Duración negativa debería fallar
     with pytest.raises(Exception):
         ViewCommand(
             anime_id=1,

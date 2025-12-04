@@ -187,6 +187,9 @@ $RECYCLE.BIN/
 # data/*.json
 # data/*.parquet
 
+# Documentation (personal/educational)
+docs/
+
 # Temporary files
 tmp/
 temp/

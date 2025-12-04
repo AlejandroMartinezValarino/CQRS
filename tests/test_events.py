@@ -52,7 +52,6 @@ def test_rating_given_event():
 
 def test_rating_validation():
     """Test de validación de rating."""
-    # Rating válido
     event = RatingGiven(
         aggregate_id="anime_1",
         anime_id=1,
@@ -61,12 +60,11 @@ def test_rating_validation():
     )
     assert event.rating == 7.5
     
-    # Rating fuera de rango debería fallar
     with pytest.raises(Exception):
         RatingGiven(
             aggregate_id="anime_1",
             anime_id=1,
             user_id="user123",
-            rating=11.0  # Fuera de rango
+            rating=11.0
         )
 
