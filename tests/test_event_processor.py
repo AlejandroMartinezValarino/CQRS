@@ -182,8 +182,9 @@ async def test_process_click_event_success(event_processor, mock_pool):
     event_processor._is_event_processed.assert_called_once_with("click-123")
     assert conn.execute.call_count == 2
     event_processor._mark_event_processed.assert_called_once()
+
     call_args = event_processor._mark_event_processed.call_args
-    assert call_args[1]['status']== 'success'
+    assert call_args[0][4] == 'success'
 
 
 @pytest.mark.asyncio

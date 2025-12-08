@@ -187,7 +187,7 @@ async def test_consume_events_increments_counters(kafka_consumer):
     
     await kafka_consumer.consume_events()
 
-    kafka_consumer._process_message.assert_called_twice()
+    assert kafka_consumer._process_message.call_count == 2
     assert kafka_consumer._processed_count == 2
     assert kafka_consumer._error_count == 0
 
@@ -200,7 +200,7 @@ async def test_health_check_healthy(kafka_consumer):
     kafka_consumer._processed_count = 10
     kafka_consumer._error_count = 2
     
-    result = kafka_consumer.health_check()
+    result = await kafka_consumer.health_check()
 
     assert result['status'] == "healthy"
     assert result['processed_events'] == 10
