@@ -22,3 +22,8 @@ class InvalidRatingError(DomainException):
         if message is None:
             message = f"Calificación {rating} no es válida. Debe estar entre 1.0 y 10.0"
         super().__init__(message)
+
+
+class EventProcessingError(DomainException):
+    """Excepción lanzada cuando falla el procesamiento de un evento."""
+    pass
