@@ -27,3 +27,7 @@ class InvalidRatingError(DomainException):
 class EventProcessingError(DomainException):
     """Excepción lanzada cuando falla el procesamiento de un evento."""
     pass
+
+class GraphQLError(DomainException):
+    """Excepción lanzada cuando falla un query GraphQL."""
+    pass

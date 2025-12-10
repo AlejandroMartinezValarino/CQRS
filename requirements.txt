@@ -5,7 +5,7 @@ pydantic>=2.5.0
 pydantic-settings>=2.1.0
 
 # GraphQL (Read Side)
-strawberry-graphql==0.213.0
+strawberry-graphql>=0.213.0
 
 # Database
 asyncpg>=0.29.0

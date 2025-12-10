@@ -133,7 +133,6 @@ async def test_validate_event_success(event_processor):
         "occurred_at": datetime.utcnow()
     }
     
-    # No debería lanzar excepción
     event_processor._validate_event(event, ["anime_id", "user_id", "occurred_at"])
 
 
@@ -142,7 +141,6 @@ async def test_validate_event_missing_fields(event_processor):
     """Test que _validate_event lanza excepción con campos faltantes."""
     event = {
         "anime_id": 1
-        # Faltan user_id y occurred_at
     }
     
     with pytest.raises(EventProcessingError) as exc_info:
@@ -157,7 +155,6 @@ async def test_process_click_event_success(event_processor, mock_pool):
     pool, conn = mock_pool
     event_processor._pool = pool
     
-    # Mock para _is_event_processed (retorna False = no procesado)
     event_processor._is_event_processed = AsyncMock(return_value=False)
     event_processor._mark_event_processed = AsyncMock()
     
@@ -229,7 +226,6 @@ async def test_process_view_event_negative_duration(event_processor, mock_pool):
     with pytest.raises(EventProcessingError) as exc_info:
         await event_processor.process_view_event(event)
     
-    # Verificar el mensaje de error
     assert "duration_seconds debe ser positivo" in str(exc_info.value)
 
 
@@ -254,6 +250,5 @@ async def test_process_rating_event_invalid_rating(event_processor, mock_pool):
     with pytest.raises(EventProcessingError) as exc_info:
         await event_processor.process_rating_event(event)
     
-    # Verificar el mensaje de error
     assert "Rating debe estar entre 1.0 y 10.0" in str(exc_info.value)
 
