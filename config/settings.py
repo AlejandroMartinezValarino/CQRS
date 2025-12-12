@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     ENABLE_METRICS: bool = Field(default=True, description="Habilitar métricas")
     METRICS_PORT: int = Field(default=9090, ge=1, le=65535, description="Puerto para métricas")
     
+    # Cache
+    CACHE_ENABLED: bool = Field(default=True, description="Habilitar caché")
+    CACHE_DEFAULT_TTL: int = Field(default=300, ge=1, description="TTL por defecto en segundos (5 minutos)")
+    CACHE_STATS_ENABLED: bool = Field(default=True, description="Habilitar estadísticas de caché")
+
     @validator("ENVIRONMENT")
     def validate_environment(cls, v):
         """Valida que el entorno sea válido."""

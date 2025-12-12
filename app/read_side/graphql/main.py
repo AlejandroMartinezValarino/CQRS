@@ -16,7 +16,6 @@ app = FastAPI(
     docs_url="/graphql/docs" if not settings.is_production else None,
 )
 
-# Configurar CORS
 if settings.ALLOWED_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
@@ -83,6 +82,19 @@ async def health():
     
     return health_status
 
+@app.get("/metrics")
+async def metrics():
+    """Endpoint de métricas del sistema."""
+    repo = get_repository()
+    cache_stats = repo.get_cache_stats()
+    
+    metrics_data = {
+        "service": "read-side-graphql",
+        "version": "1.0.0",
+        "cache": cache_stats if cache_stats else {"enabled": False}
+    }
+    
+    return metrics_data
 
 @app.get("/ready")
 async def readiness():

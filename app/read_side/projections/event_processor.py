@@ -132,6 +132,9 @@ class EventProcessor:
                 f"Evento ClickRegistered procesado: anime_id={anime_id}, user_id={user_id}, "
                 f"duration={duration_ms}ms"
             )
+
+            if hasattr(self, '_repository') and self._repository:
+                self._repository.invalidate_anime_cache(anime_id)
             
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
@@ -197,6 +200,9 @@ class EventProcessor:
                 f"duration={duration_seconds}s, processing_time={duration_ms}ms"
             )
             
+            if hasattr(self, '_repository') and self._repository:
+                self._repository.invalidate_anime_cache(anime_id)
+
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             error_msg = str(e)
@@ -269,6 +275,9 @@ class EventProcessor:
                 f"rating={rating}, avg_rating={avg_rating:.2f}, processing_time={duration_ms}ms"
             )
             
+            if hasattr(self, '_repository') and self._repository:
+                self._repository.invalidate_anime_cache(anime_id)
+
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             error_msg = str(e)
