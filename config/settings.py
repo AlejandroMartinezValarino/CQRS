@@ -38,13 +38,13 @@ class Settings(BaseSettings):
     
     # API - Command Side
     API_HOST: str = Field(default="0.0.0.0", description="Host del API")
-    API_PORT: int = Field(default=8000, ge=1, le=65535, description="Puerto del API")
+    API_PORT: int = Field(default_factory=lambda: int(os.getenv("PORT", "8000")), ge=1, le=65535, description="Puerto del API")
     API_WORKERS: int = Field(default=4, ge=1, le=32, description="Número de workers")
     API_RELOAD: bool = Field(default=False, description="Auto-reload (solo desarrollo)")
     
     # GraphQL - Read Side
     GRAPHQL_HOST: str = Field(default="0.0.0.0", description="Host de GraphQL")
-    GRAPHQL_PORT: int = Field(default=8001, ge=1, le=65535, description="Puerto de GraphQL")
+    GRAPHQL_PORT: int = Field(default_factory=lambda: int(os.getenv("PORT", "8001")), ge=1, le=65535, description="Puerto de GraphQL")
     GRAPHQL_WORKERS: int = Field(default=4, ge=1, le=32, description="Número de workers")
     
     # Security

@@ -1,5 +1,5 @@
-"""Script para ejecutar migraciones SQL usando psql."""
-import subprocess
+"""Script para ejecutar migraciones SQL usando asyncpg."""
+import asyncio
 import sys
 from pathlib import Path
 
@@ -8,56 +8,50 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from config.settings import settings
+import asyncpg
 
 
-def run_migration(db_name: str, migration_file: Path):
-    """Ejecuta una migración SQL usando psql."""
+async def run_migration(db_name: str, migration_file: Path):
+    """Ejecuta una migración SQL usando asyncpg."""
     try:
-        # Usar psql con conexión TCP/IP usando el usuario de settings
-        # Leer usuario desde settings
-        import os
-        from config.settings import settings
-        
-        user = settings.POSTGRES_USER
-        password = settings.POSTGRES_PASSWORD
-        
-        # Usar PGPASSWORD para evitar prompt
-        env = os.environ.copy()
-        env['PGPASSWORD'] = password
-        
-        cmd = [
-            "psql",
-            "-h", "localhost",  # Forzar conexión TCP/IP
-            "-U", user,
-            "-d", db_name,
-            "-f", str(migration_file.absolute())
-        ]
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=False,
-            env=env
+        conn = await asyncpg.connect(
+            host=settings.POSTGRES_HOST,
+            port=settings.POSTGRES_PORT,
+            user=settings.POSTGRES_USER,
+            password=settings.POSTGRES_PASSWORD,
+            database=db_name
         )
         
-        if result.returncode == 0:
+        try:
+            sql_content = migration_file.read_text()
+            await conn.execute(sql_content)
             print(f"✓ Migración {migration_file.name} ejecutada en {db_name}")
-        else:
-            # Si hay errores, mostrarlos pero continuar
-            if "already exists" in result.stderr.lower() or "already exists" in result.stdout.lower():
-                print(f"⚠ Tablas ya existen en {db_name} (esto es normal si ya ejecutaste las migraciones)")
-            else:
-                print(f"✗ Error ejecutando {migration_file.name} en {db_name}")
-                print(f"  Error: {result.stderr}")
-                return False
-        return True
+            return True
+        except asyncpg.exceptions.DuplicateTableError:
+            print(f"⚠ Tablas ya existen en {db_name} (esto es normal si ya ejecutaste las migraciones)")
+            return True
+        except asyncpg.exceptions.DuplicateObjectError as e:
+            if "already exists" in str(e).lower():
+                print(f"⚠ Objetos ya existen en {db_name} (esto es normal si ya ejecutaste las migraciones)")
+                return True
+            raise
+        except asyncpg.exceptions.PostgresSyntaxError as e:
+            print(f"✗ Error de sintaxis en {migration_file.name}: {e}")
+            return False
+        finally:
+            await conn.close()
+    except asyncpg.exceptions.InvalidPasswordError:
+        print(f"✗ Error de autenticación para {db_name}")
+        return False
+    except asyncpg.exceptions.InvalidCatalogNameError:
+        print(f"✗ Base de datos {db_name} no existe")
+        return False
     except Exception as e:
         print(f"✗ Error ejecutando {migration_file.name} en {db_name}: {e}")
         return False
 
 
-def main():
+async def main():
     """Función principal."""
     migrations_dir = Path(__file__).parent / "migrations"
     
@@ -74,7 +68,7 @@ def main():
     success = True
     for db_name, migration_file in migrations:
         if migration_file.exists():
-            if not run_migration(db_name, migration_file):
+            if not await run_migration(db_name, migration_file):
                 success = False
         else:
             print(f"⚠ Archivo no encontrado: {migration_file}")
@@ -84,13 +78,8 @@ def main():
         print("\n✓ Migraciones completadas!")
     else:
         print("\n⚠ Algunas migraciones tuvieron problemas. Revisa los mensajes arriba.")
-        print("\nAlternativa: Ejecuta las migraciones manualmente con:")
-        print(f"  export PGPASSWORD={settings.POSTGRES_PASSWORD}")
-        print(f"  psql -h localhost -U {settings.POSTGRES_USER} -d {settings.POSTGRES_EVENT_STORE_DB} -f scripts/migrations/001_create_event_store.sql")
-        print(f"  psql -h localhost -U {settings.POSTGRES_USER} -d {settings.POSTGRES_DB} -f scripts/migrations/002_create_read_model.sql")
-        print(f"  unset PGPASSWORD")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 
