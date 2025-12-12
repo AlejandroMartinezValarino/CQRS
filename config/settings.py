@@ -49,7 +49,10 @@ class Settings(BaseSettings):
     
     # Security
     ALLOWED_ORIGINS: list[str] = Field(
-        default_factory=lambda: ["*"] if os.getenv("ENVIRONMENT") != "production" else [],
+        default_factory=lambda: (
+            ["*"] if os.getenv("ENVIRONMENT") != "production" 
+            else ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
+        ),
         description="Orígenes permitidos para CORS"
     )
     
