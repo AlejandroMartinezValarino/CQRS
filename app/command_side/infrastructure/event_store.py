@@ -82,7 +82,7 @@ class EventStore:
                             event.event_id,
                             event.event_type,
                             event.aggregate_id,
-                            json.dumps(event.model_dump()),
+                            event.model_dump_json(),
                             event.occurred_at,
                             event.version,
                             json.dumps(event.metadata),
@@ -125,8 +125,6 @@ class EventStore:
             events = []
             for row in rows:
                 event_data = json.loads(row["event_data"])
-                # Aquí deberías reconstruir el evento según su tipo
-                # Por simplicidad, retornamos el dict
                 events.append(event_data)
             
             return events

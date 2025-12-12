@@ -147,14 +147,14 @@ async def health():
         "version": "1.0.0"
     }
     
-    # Verificar Event Store
     event_store_healthy = await command_handler.event_store.health_check()
+    kafka_healthy = command_handler.kafka_producer.health_check()
     health_status["dependencies"] = {
         "event_store": "healthy" if event_store_healthy else "unhealthy",
-        "kafka": "healthy"  # TODO: Implementar health check de Kafka
+        "kafka": "healthy" if kafka_healthy else "unhealthy"
     }
     
-    if not event_store_healthy:
+    if not event_store_healthy or not kafka_healthy:
         health_status["status"] = "degraded"
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

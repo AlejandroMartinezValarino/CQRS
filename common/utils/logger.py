@@ -8,7 +8,6 @@ from config.settings import settings
 
 def setup_logging():
     """Configura el sistema de logging."""
-    # Crear directorio de logs si no existe
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     

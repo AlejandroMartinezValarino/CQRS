@@ -66,8 +66,7 @@ async def health():
     
     try:
         repo = get_repository()
-        # Verificar conexión a la base de datos
-        test_query = await repo.get_anime_stats(1)  # Query de prueba
+        test_query = await repo.get_anime_stats(1)
         health_status["dependencies"] = {
             "database": "healthy"
         }

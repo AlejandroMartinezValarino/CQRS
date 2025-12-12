@@ -84,7 +84,6 @@ async def load_csv_to_db(csv_path: Path, batch_size: int = 100):
     )
     
     try:
-        # Crear tabla
         await create_table(conn)
         
         # Leer CSV

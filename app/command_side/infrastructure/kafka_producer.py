@@ -2,8 +2,12 @@
 import json
 from typing import List
 from kafka import KafkaProducer
+from kafka.errors import KafkaError
 from common.events.base_event import BaseEvent
+from common.utils.logger import get_logger
 from config.settings import settings
+
+logger = get_logger(__name__)
 
 
 class KafkaEventProducer:
@@ -38,4 +42,16 @@ class KafkaEventProducer:
         """Cierra el productor."""
         if self._producer:
             self._producer.close()
+    
+    def health_check(self) -> bool:
+        """Verifica la salud de la conexión a Kafka."""
+        try:
+            if not self._producer:
+                self.connect()
+            
+            metadata = self._producer.list_topics(timeout=5)
+            return metadata is not None
+        except (KafkaError, Exception) as e:
+            logger.error(f"Health check de Kafka falló: {e}")
+            return False
 
