@@ -5,6 +5,11 @@ echo "=========================================="
 echo "Iniciando Command Side API"
 echo "=========================================="
 
+# Esperar a que la red privada esté lista (según Railway docs)
+# Algunos usuarios reportan que necesitan más tiempo
+echo "Esperando a que la red privada esté lista..."
+sleep 5
+
 echo "Creando bases de datos si no existen..."
 if ! python scripts/create_databases.py; then
     echo "ERROR: Falló la creación de bases de datos"
