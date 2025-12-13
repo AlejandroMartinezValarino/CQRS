@@ -237,3 +237,248 @@ class ReadModelRepository:
         except Exception as e:
             logger.error(f"Error obteniendo anime {anime_id}: {e}", exc_info=True)
             raise
+    
+    @retry_async(max_attempts=3, exceptions=(asyncpg.PostgresError,))
+    async def search_animes(
+        self,
+        search: Optional[str] = None,
+        anime_type: Optional[str] = None,
+        genres: Optional[List[str]] = None,
+        min_score: Optional[float] = None,
+        sort_by: str = "popularity",
+        page: int = 1,
+        page_size: int = 20
+    ) -> tuple[List[dict], int]:
+        try:
+            if not self._pool:
+                raise RuntimeError("Repository no está conectado. Llama a connect() primero.")
+            
+            offset = (page - 1) * page_size
+            
+            base_query = """
+                SELECT 
+                    a.myanimelist_id,
+                    a.title,
+                    a.description,
+                    a.image,
+                    a.type,
+                    a.episodes,
+                    a.score,
+                    a.popularity,
+                    a.genres,
+                    COALESCE(s.total_clicks, 0) as total_clicks,
+                    COALESCE(s.total_views, 0) as total_views,
+                    COALESCE(s.total_ratings, 0) as total_ratings,
+                    s.average_rating
+                FROM animes a
+                LEFT JOIN anime_stats s ON a.myanimelist_id = s.anime_id
+                WHERE 1=1
+            """
+            
+            conditions = []
+            params = []
+            param_count = 1
+            
+            if search:
+                conditions.append(f"a.title ILIKE ${param_count}")
+                params.append(f"%{search}%")
+                param_count += 1
+            
+            if anime_type:
+                conditions.append(f"a.type = ${param_count}")
+                params.append(anime_type)
+                param_count += 1
+            
+            if genres:
+                genre_conditions = []
+                for genre in genres:
+                    genre_conditions.append(f"a.genres ILIKE ${param_count}")
+                    params.append(f"%{genre}%")
+                    param_count += 1
+                conditions.append(f"({' OR '.join(genre_conditions)})")
+            
+            if min_score:
+                conditions.append(f"a.score >= ${param_count}")
+                params.append(min_score)
+                param_count += 1
+            
+            if conditions:
+                base_query += " AND " + " AND ".join(conditions)
+            
+            sort_mapping = {
+                "popularity": "a.popularity ASC NULLS LAST",
+                "score": "a.score DESC NULLS LAST",
+                "title": "a.title ASC",
+                "views": "COALESCE(s.total_views, 0) DESC"
+            }
+            order_clause = sort_mapping.get(sort_by, "a.popularity ASC NULLS LAST")
+            
+            count_query = f"SELECT COUNT(*) FROM ({base_query}) as filtered"
+            data_query = f"{base_query} ORDER BY {order_clause} LIMIT ${param_count} OFFSET ${param_count + 1}"
+            params.extend([page_size, offset])
+            
+            async with self._pool.acquire() as conn:
+                total = await conn.fetchval(count_query, *params[:-2])
+                rows = await conn.fetch(data_query, *params)
+                return [dict(row) for row in rows], total
+                
+        except Exception as e:
+            logger.error(f"Error buscando animes: {e}", exc_info=True)
+            raise
+    
+    @retry_async(max_attempts=3, exceptions=(asyncpg.PostgresError,))
+    async def get_trending_animes(self, days: int = 7, limit: int = 10) -> List[dict]:
+        try:
+            if not self._pool:
+                raise RuntimeError("Repository no está conectado. Llama a connect() primero.")
+            
+            self._validate_limit(limit)
+            
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT 
+                        a.myanimelist_id,
+                        a.title,
+                        a.description,
+                        a.image,
+                        a.type,
+                        a.episodes,
+                        a.score,
+                        a.popularity,
+                        a.genres,
+                        COALESCE(recent.clicks, 0) + COALESCE(recent.views, 0) + COALESCE(recent.ratings, 0) as total_interactions,
+                        COALESCE(s.total_clicks, 0) as total_clicks,
+                        COALESCE(s.total_views, 0) as total_views,
+                        COALESCE(s.total_ratings, 0) as total_ratings,
+                        s.average_rating
+                    FROM animes a
+                    LEFT JOIN anime_stats s ON a.myanimelist_id = s.anime_id
+                    LEFT JOIN (
+                        SELECT 
+                            anime_id,
+                            COUNT(DISTINCT CASE WHEN EXISTS (
+                                SELECT 1 FROM anime_clicks WHERE anime_id = anime_stats.anime_id 
+                                AND timestamp >= NOW() - INTERVAL '%s days'
+                            ) THEN 1 END) as clicks,
+                            COUNT(DISTINCT CASE WHEN EXISTS (
+                                SELECT 1 FROM anime_views WHERE anime_id = anime_stats.anime_id 
+                                AND timestamp >= NOW() - INTERVAL '%s days'
+                            ) THEN 1 END) as views,
+                            COUNT(DISTINCT CASE WHEN EXISTS (
+                                SELECT 1 FROM anime_ratings WHERE anime_id = anime_stats.anime_id 
+                                AND timestamp >= NOW() - INTERVAL '%s days'
+                            ) THEN 1 END) as ratings
+                        FROM anime_stats
+                        GROUP BY anime_id
+                    ) recent ON a.myanimelist_id = recent.anime_id
+                    WHERE recent.clicks IS NOT NULL OR recent.views IS NOT NULL OR recent.ratings IS NOT NULL
+                    ORDER BY total_interactions DESC, s.total_views DESC
+                    LIMIT $1
+                """, limit)
+                return [dict(row) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"Error obteniendo trending animes: {e}", exc_info=True)
+            raise
+    
+    @retry_async(max_attempts=3, exceptions=(asyncpg.PostgresError,))
+    async def get_recommended_animes(self, anime_id: int, limit: int = 10) -> List[dict]:
+        try:
+            if not self._pool:
+                raise RuntimeError("Repository no está conectado. Llama a connect() primero.")
+            
+            self._validate_anime_id(anime_id)
+            self._validate_limit(limit)
+            
+            async with self._pool.acquire() as conn:
+                base_anime = await conn.fetchrow(
+                    "SELECT genres, type FROM animes WHERE myanimelist_id = $1",
+                    anime_id
+                )
+                
+                if not base_anime or not base_anime["genres"]:
+                    rows = await conn.fetch("""
+                        SELECT 
+                            a.myanimelist_id,
+                            a.title,
+                            a.description,
+                            a.image,
+                            a.type,
+                            a.episodes,
+                            a.score,
+                            a.popularity,
+                            a.genres,
+                            COALESCE(s.total_clicks, 0) as total_clicks,
+                            COALESCE(s.total_views, 0) as total_views,
+                            COALESCE(s.total_ratings, 0) as total_ratings,
+                            s.average_rating
+                        FROM animes a
+                        LEFT JOIN anime_stats s ON a.myanimelist_id = s.anime_id
+                        WHERE a.myanimelist_id != $1
+                        ORDER BY a.score DESC NULLS LAST
+                        LIMIT $2
+                    """, anime_id, limit)
+                else:
+                    genres_list = [g.strip() for g in base_anime["genres"].split(",")]
+                    genre_conditions = " OR ".join([f"a.genres ILIKE '%{g}%'" for g in genres_list[:3]])
+                    
+                    query = f"""
+                        SELECT 
+                            a.myanimelist_id,
+                            a.title,
+                            a.description,
+                            a.image,
+                            a.type,
+                            a.episodes,
+                            a.score,
+                            a.popularity,
+                            a.genres,
+                            COALESCE(s.total_clicks, 0) as total_clicks,
+                            COALESCE(s.total_views, 0) as total_views,
+                            COALESCE(s.total_ratings, 0) as total_ratings,
+                            s.average_rating
+                        FROM animes a
+                        LEFT JOIN anime_stats s ON a.myanimelist_id = s.anime_id
+                        WHERE a.myanimelist_id != $1
+                            AND ({genre_conditions})
+                            AND a.type = $2
+                        ORDER BY a.score DESC NULLS LAST
+                        LIMIT $3
+                    """
+                    rows = await conn.fetch(query, anime_id, base_anime["type"], limit)
+                
+                return [dict(row) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"Error obteniendo recomendaciones: {e}", exc_info=True)
+            raise
+    
+    @retry_async(max_attempts=3, exceptions=(asyncpg.PostgresError,))
+    async def get_all_genres(self) -> List[str]:
+        try:
+            if not self._pool:
+                raise RuntimeError("Repository no está conectado. Llama a connect() primero.")
+            
+            cache_key = "all_genres"
+            if self._cache:
+                cached = self._cache.get(cache_key)
+                if cached is not None:
+                    return cached
+            
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT DISTINCT TRIM(genre) as genre
+                    FROM animes, unnest(string_to_array(genres, ',')) as genre
+                    WHERE genres IS NOT NULL AND genres != ''
+                    ORDER BY genre
+                """)
+                genres = [row["genre"] for row in rows if row["genre"]]
+                
+                if self._cache:
+                    self._cache.set(cache_key, genres, ttl=3600)
+                
+                return genres
+                
+        except Exception as e:
+            logger.error(f"Error obteniendo géneros: {e}", exc_info=True)
+            raise
