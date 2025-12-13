@@ -46,46 +46,58 @@ def get_pool_kwargs(
         kwargs['database'] = database or settings.POSTGRES_DB
     
     # Prioridad 2: DATABASE_URL (si no se usaron variables PGHOST)
+    # En Railway, es mejor usar DATABASE_URL directamente como DSN
+    # en lugar de parsearla, ya que asyncpg puede resolver mejor los hostnames
     if 'host' not in kwargs:
         database_url = getattr(settings, 'DATABASE_URL', None)
         if database_url and not database_url.startswith("${{"):
             try:
-                # Parsear la URL (puede ser postgresql:// o postgres://)
-                parsed = urlparse(database_url)
+                # Si se especifica una base de datos diferente, modificar la URL
+                if database:
+                    parsed = urlparse(database_url)
+                    # Cambiar el path para usar la base de datos especificada
+                    modified_url = urlunparse((
+                        parsed.scheme,
+                        parsed.netloc,
+                        f'/{database}',
+                        parsed.params,
+                        parsed.query,
+                        parsed.fragment
+                    ))
+                    # Usar la DSN directamente - asyncpg puede resolver mejor los hostnames
+                    kwargs['dsn'] = modified_url
+                else:
+                    # Usar la DSN directamente sin modificar
+                    kwargs['dsn'] = database_url
                 
-                hostname = parsed.hostname
-                
-                # En Railway, postgres.railway.internal puede no resolverse
-                # Intentar usar localhost si estamos en Railway y el hostname es .railway.internal
-                if hostname and hostname.endswith('.railway.internal'):
-                    # En Railway, los servicios en la misma red privada pueden usar localhost
-                    # o el hostname puede necesitar ser resuelto de otra manera
-                    # Por ahora, intentaremos usar el hostname original
-                    # Si falla, el código que llama puede intentar con localhost
-                    pass
-                
-                # Extraer componentes de la URL y usar parámetros individuales
-                # Esto evita que asyncpg parse la DSN y extraiga parámetros inválidos de la query string
-                kwargs['host'] = hostname or settings.POSTGRES_HOST
-                kwargs['port'] = parsed.port or settings.POSTGRES_PORT
-                kwargs['user'] = parsed.username or settings.POSTGRES_USER
-                kwargs['password'] = parsed.password or settings.POSTGRES_PASSWORD
-                
-                # Determinar la base de datos
-                db_name = database or (parsed.path.lstrip('/') if parsed.path else settings.POSTGRES_DB)
-                kwargs['database'] = db_name
+                # Marcar que usamos DSN para evitar agregar parámetros individuales después
+                kwargs['_using_dsn'] = True
                 
             except Exception:
-                # Si hay error parseando DATABASE_URL, usar variables individuales
-                pass
+                # Si hay error, intentar parsear la URL como antes
+                try:
+                    parsed = urlparse(database_url)
+                    hostname = parsed.hostname
+                    kwargs['host'] = hostname or settings.POSTGRES_HOST
+                    kwargs['port'] = parsed.port or settings.POSTGRES_PORT
+                    kwargs['user'] = parsed.username or settings.POSTGRES_USER
+                    kwargs['password'] = parsed.password or settings.POSTGRES_PASSWORD
+                    db_name = database or (parsed.path.lstrip('/') if parsed.path else settings.POSTGRES_DB)
+                    kwargs['database'] = db_name
+                except Exception:
+                    pass
     
     # Prioridad 3: Variables individuales de configuración (fallback)
-    if 'host' not in kwargs:
+    # Solo usar si no estamos usando DSN
+    if 'host' not in kwargs and not kwargs.get('_using_dsn'):
         kwargs['host'] = settings.POSTGRES_HOST
         kwargs['port'] = settings.POSTGRES_PORT
         kwargs['user'] = settings.POSTGRES_USER
         kwargs['password'] = settings.POSTGRES_PASSWORD
         kwargs['database'] = database or settings.POSTGRES_DB
+    
+    # Limpiar el flag interno
+    kwargs.pop('_using_dsn', None)
     
     # Agregar configuraciones del pool
     if min_size is not None:
