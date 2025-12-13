@@ -48,9 +48,34 @@ for var, value in sorted(all_vars.items()):
         print(f"  {var}: {value}")
 
 # Verificar si estamos en Railway
-print("\nInformación del entorno:")
-print(f"  RAILWAY_ENVIRONMENT: {os.getenv('RAILWAY_ENVIRONMENT', '[no configurada]')}")
-print(f"  RAILWAY_PROJECT_ID: {os.getenv('RAILWAY_PROJECT_ID', '[no configurada]')}")
-print(f"  RAILWAY_SERVICE_NAME: {os.getenv('RAILWAY_SERVICE_NAME', '[no configurada]')}")
+print("\nInformación del entorno Railway:")
+railway_vars = [
+    'RAILWAY_ENVIRONMENT', 'RAILWAY_PROJECT_ID', 'RAILWAY_SERVICE_NAME',
+    'RAILWAY_PRIVATE_DOMAIN', 'RAILWAY_TCP_PROXY_DOMAIN', 'RAILWAY_TCP_PROXY_PORT',
+    'DATABASE_PUBLIC_URL'
+]
+for var in railway_vars:
+    value = os.getenv(var)
+    if value:
+        if 'PASSWORD' in var or (var == 'DATABASE_PUBLIC_URL' and '@' in value):
+            if '@' in value:
+                # Ocultar contraseña en DATABASE_PUBLIC_URL
+                parts = value.split('@')
+                if '://' in parts[0]:
+                    user_pass = parts[0].split('://')[1]
+                    if ':' in user_pass:
+                        user = user_pass.split(':')[0]
+                        masked = value.replace(user_pass, f"{user}:***")
+                        print(f"  {var}: {masked}")
+                    else:
+                        print(f"  {var}: [oculta]")
+                else:
+                    print(f"  {var}: [oculta]")
+            else:
+                print(f"  {var}: [oculta]")
+        else:
+            print(f"  {var}: {value}")
+    else:
+        print(f"  {var}: [no configurada]")
 
 print("\n" + "="*60)
