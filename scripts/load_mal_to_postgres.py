@@ -81,6 +81,9 @@ def parse_value(value: str, field_type: str) -> Optional[any]:
 
 async def load_csv_to_db(csv_path: Path, batch_size: int = 100):
     """Carga el CSV a PostgreSQL."""
+    # Aumentar el límite de tamaño de campo para CSV con descripciones largas
+    csv.field_size_limit(10 * 1024 * 1024)  # 10 MB
+    
     conn = await asyncpg.connect(
         host=settings.POSTGRES_HOST,
         port=settings.POSTGRES_PORT,
