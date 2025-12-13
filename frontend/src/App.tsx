@@ -18,14 +18,14 @@ const AppLayout = () => {
 
   const menuItems = [
     {
-      key: '/dashboard',
-      icon: <DashboardOutlined />,
-      label: 'Dashboard',
-    },
-    {
       key: '/animes',
       icon: <UnorderedListOutlined />,
-      label: 'Animes',
+      label: 'Explorar Animes',
+    },
+    {
+      key: '/dashboard',
+      icon: <DashboardOutlined />,
+      label: 'Estadísticas',
     },
     {
       key: '/interactions',
@@ -52,11 +52,11 @@ const AppLayout = () => {
         </Header>
         <Content style={{ margin: '24px 16px', padding: 24, background: '#fff', minHeight: 280 }}>
           <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/animes" element={<AnimeList />} />
             <Route path="/animes/:id" element={<AnimeDetail />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/interactions" element={<Interactions />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/" element={<Navigate to="/animes" replace />} />
           </Routes>
         </Content>
       </Layout>
