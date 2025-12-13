@@ -33,6 +33,14 @@ class ReadModelRepository:
                 min_size=settings.POSTGRES_MIN_CONNECTIONS,
                 max_size=settings.POSTGRES_MAX_CONNECTIONS,
                 command_timeout=settings.POSTGRES_COMMAND_TIMEOUT,
+                connect_timeout=settings.POSTGRES_CONNECT_TIMEOUT,
+                max_queries=settings.POSTGRES_MAX_QUERIES,
+                max_inactive_connection_lifetime=settings.POSTGRES_MAX_INACTIVE_CONNECTION_LIFETIME,
+                server_settings={
+                    'tcp_keepalives_idle': '600',
+                    'tcp_keepalives_interval': '30',
+                    'tcp_keepalives_count': '3',
+                },
             )
             logger.info("Pool de conexiones del ReadModelRepository creado correctamente")
         except Exception as e:
