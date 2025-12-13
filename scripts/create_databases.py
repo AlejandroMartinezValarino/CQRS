@@ -7,6 +7,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from config.settings import settings
+from common.utils.db import get_pool_kwargs
 import asyncpg
 
 
@@ -14,13 +15,8 @@ async def create_database_if_not_exists(db_name: str):
     """Crea una base de datos si no existe."""
     try:
         # Conectarse a la base de datos 'postgres' (siempre existe)
-        conn = await asyncpg.connect(
-            host=settings.POSTGRES_HOST,
-            port=settings.POSTGRES_PORT,
-            user=settings.POSTGRES_USER,
-            password=settings.POSTGRES_PASSWORD,
-            database='postgres'  # Conectarse a la BD por defecto
-        )
+        pool_kwargs = get_pool_kwargs(database='postgres')
+        conn = await asyncpg.connect(**pool_kwargs)
         
         try:
             # Verificar si la base de datos existe
