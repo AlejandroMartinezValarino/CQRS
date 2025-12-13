@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chmod +x scripts/start_read.sh scripts/run_migrations.py scripts/check_db.py
+RUN chmod +x scripts/start_read.sh scripts/run_migrations.py scripts/check_db.py scripts/create_databases.py
 
 EXPOSE 8001
 

@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+echo "Creando bases de datos si no existen..."
+python scripts/create_databases.py || echo "Advertencia: Error creando bases de datos"
+
 echo "Ejecutando migraciones..."
 python scripts/run_migrations.py || echo "Advertencia: Las migraciones pueden haber fallado o ya estar aplicadas"
 
