@@ -30,10 +30,12 @@ class KafkaEventProducer:
             self.connect()
         
         for event in events:
+            # Usar representación JSON-safe (convierte datetime a ISO)
+            payload = event.model_dump(mode="json")
             self._producer.send(
                 settings.KAFKA_TOPIC_EVENTS,
                 key=event.aggregate_id,
-                value=event.model_dump(),
+                value=payload,
             )
         
         self._producer.flush()
