@@ -1,8 +1,9 @@
 """Configuración de la aplicación con validación para producción."""
 import os
-from pydantic import Field, validator
+import json
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Union
 
 
 class Settings(BaseSettings):
@@ -56,31 +57,37 @@ class Settings(BaseSettings):
         description="Orígenes permitidos para CORS"
     )
     
-    @validator("ALLOWED_ORIGINS", pre=True)
-    def parse_allowed_origins(cls, v):
+    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v: Union[str, list, None]) -> Union[list, None]:
         """Parsea ALLOWED_ORIGINS desde JSON o string separado por comas."""
-        # Si no hay valor o está vacío, retornar None para usar default_factory
+        # Si no hay valor, retornar None para usar default_factory
         if v is None:
             return None
+        
+        # Si ya es una lista, retornarla directamente
+        if isinstance(v, list):
+            return v
+        
+        # Si es un string
         if isinstance(v, str):
             # Si está vacío, retornar None para usar default_factory
-            if not v.strip():
+            v_stripped = v.strip()
+            if not v_stripped:
                 return None
-            # Intentar parsear como JSON
+            
+            # Intentar parsear como JSON primero
             try:
-                import json
-                parsed = json.loads(v)
+                parsed = json.loads(v_stripped)
                 if isinstance(parsed, list):
                     return parsed
-                # Si es un string JSON pero no una lista, retornar None
+                # Si es JSON pero no una lista, retornar None
                 return None
             except (json.JSONDecodeError, ValueError):
                 # Si no es JSON válido, tratar como string separado por comas
-                origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+                origins = [origin.strip() for origin in v_stripped.split(",") if origin.strip()]
                 return origins if origins else None
-        # Si ya es una lista, retornarla
-        if isinstance(v, list):
-            return v
+        
         # Para cualquier otro tipo, retornar None para usar default_factory
         return None
     
@@ -93,28 +100,30 @@ class Settings(BaseSettings):
     CACHE_DEFAULT_TTL: int = Field(default=300, ge=1, description="TTL por defecto en segundos (5 minutos)")
     CACHE_STATS_ENABLED: bool = Field(default=True, description="Habilitar estadísticas de caché")
 
-    @validator("ENVIRONMENT")
-    def validate_environment(cls, v):
+    @field_validator("ENVIRONMENT")
+    @classmethod
+    def validate_environment(cls, v: str) -> str:
         """Valida que el entorno sea válido."""
         allowed = ["development", "staging", "production"]
         if v not in allowed:
             raise ValueError(f"ENVIRONMENT debe ser uno de: {', '.join(allowed)}")
         return v
     
-    @validator("LOG_LEVEL")
-    def validate_log_level(cls, v):
+    @field_validator("LOG_LEVEL")
+    @classmethod
+    def validate_log_level(cls, v: str) -> str:
         """Valida que el nivel de log sea válido."""
         allowed = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in allowed:
             raise ValueError(f"LOG_LEVEL debe ser uno de: {', '.join(allowed)}")
         return v.upper()
     
-    @validator("POSTGRES_PASSWORD")
-    def validate_password(cls, v, values):
+    @model_validator(mode='after')
+    def validate_password(self):
         """Valida que la contraseña no sea la por defecto en producción."""
-        if values.get("ENVIRONMENT") == "production" and v == "postgres":
+        if self.ENVIRONMENT == "production" and self.POSTGRES_PASSWORD == "postgres":
             raise ValueError("No se puede usar la contraseña por defecto en producción")
-        return v
+        return self
     
     @property
     def is_production(self) -> bool:
@@ -126,12 +135,12 @@ class Settings(BaseSettings):
         """Indica si estamos en desarrollo."""
         return self.ENVIRONMENT == "development"
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
-        # En producción, no permitir valores por defecto inseguros
-        validate_assignment = True
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": True,
+        "validate_assignment": True,
+    }
 
 
 settings = Settings()
