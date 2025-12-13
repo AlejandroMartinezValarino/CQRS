@@ -1,6 +1,5 @@
 """Schema GraphQL."""
 from typing import List, Optional
-
 import strawberry
 
 from app.read_side.graphql.exceptions import InvalidLimitError
@@ -18,6 +17,60 @@ def get_repository() -> ReadModelRepository:
     if _repository is None:
         _repository = ReadModelRepository()
     return _repository
+
+
+def _validate_limit(limit: int) -> None:
+    if limit < 1:
+        raise ValueError("El límite debe ser mayor a 0")
+    if limit > 100:
+        raise ValueError("El límite no puede ser mayor a 100")
+
+
+def _validate_anime_id(anime_id: int) -> None:
+    if anime_id < 1:
+        raise ValueError("El anime_id debe ser mayor a 0")
+
+
+def _row_to_anime_stats(row: dict) -> "AnimeStats":
+    return AnimeStats(
+        anime_id=row["anime_id"],
+        total_clicks=row["total_clicks"] or 0,
+        total_views=row["total_views"] or 0,
+        total_ratings=row["total_ratings"] or 0,
+        average_rating=float(row["average_rating"]) if row["average_rating"] else None,
+        total_duration_seconds=row["total_duration_seconds"] or 0,
+    )
+
+
+def _row_to_anime(row: dict) -> "Anime":
+    return Anime(
+        myanimelist_id=row["myanimelist_id"],
+        title=row["title"],
+        description=row.get("description"),
+        image=row.get("image"),
+        type=row.get("type"),
+        episodes=row.get("episodes"),
+        score=float(row["score"]) if row.get("score") else None,
+        popularity=row.get("popularity"),
+    )
+
+
+def _row_to_anime_with_stats(row: dict) -> "AnimeWithStats":
+    return AnimeWithStats(
+        myanimelist_id=row["myanimelist_id"],
+        title=row["title"],
+        description=row.get("description"),
+        image=row.get("image"),
+        type=row.get("type"),
+        episodes=row.get("episodes"),
+        score=float(row["score"]) if row.get("score") else None,
+        popularity=row.get("popularity"),
+        genres=row.get("genres"),
+        total_clicks=row.get("total_clicks", 0),
+        total_views=row.get("total_views", 0),
+        total_ratings=row.get("total_ratings", 0),
+        average_rating=float(row["average_rating"]) if row.get("average_rating") else None,
+    )
 
 
 @strawberry.type
@@ -82,60 +135,6 @@ class AnimeFilters:
     sort_by: Optional[str] = "popularity"
 
 
-def _validate_limit(limit: int) -> None:
-    if limit < 1:
-        raise ValueError("El límite debe ser mayor a 0")
-    if limit > 100:
-        raise ValueError("El límite no puede ser mayor a 100")
-
-
-def _validate_anime_id(anime_id: int) -> None:
-    if anime_id < 1:
-        raise ValueError("El anime_id debe ser mayor a 0")
-
-
-def _row_to_anime_stats(row: dict) -> AnimeStats:
-    return AnimeStats(
-        anime_id=row["anime_id"],
-        total_clicks=row["total_clicks"] or 0,
-        total_views=row["total_views"] or 0,
-        total_ratings=row["total_ratings"] or 0,
-        average_rating=float(row["average_rating"]) if row["average_rating"] else None,
-        total_duration_seconds=row["total_duration_seconds"] or 0,
-    )
-
-
-def _row_to_anime(row: dict) -> Anime:
-    return Anime(
-        myanimelist_id=row["myanimelist_id"],
-        title=row["title"],
-        description=row.get("description"),
-        image=row.get("image"),
-        type=row.get("type"),
-        episodes=row.get("episodes"),
-        score=float(row["score"]) if row.get("score") else None,
-        popularity=row.get("popularity"),
-    )
-
-
-def _row_to_anime_with_stats(row: dict) -> AnimeWithStats:
-    return AnimeWithStats(
-        myanimelist_id=row["myanimelist_id"],
-        title=row["title"],
-        description=row.get("description"),
-        image=row.get("image"),
-        type=row.get("type"),
-        episodes=row.get("episodes"),
-        score=float(row["score"]) if row.get("score") else None,
-        popularity=row.get("popularity"),
-        genres=row.get("genres"),
-        total_clicks=row.get("total_clicks", 0),
-        total_views=row.get("total_views", 0),
-        total_ratings=row.get("total_ratings", 0),
-        average_rating=float(row["average_rating"]) if row.get("average_rating") else None,
-    )
-
-
 @strawberry.type
 class Query:
     """Queries GraphQL."""
@@ -180,8 +179,7 @@ class Query:
                 return None
             logger.debug(f"Se obtuvo la estadística del anime {anime_id}")
             return _row_to_anime_stats(row)
-        except ValueError as e:
-            logger.error(f"Error al obtener las estadísticas del anime {anime_id}: {e}", exc_info=True)
+        except ValueError:
             raise AnimeNotFoundError(anime_id)
         except Exception as e:
             logger.error(f"Error al obtener las estadísticas del anime {anime_id}: {e}", exc_info=True)
@@ -197,8 +195,7 @@ class Query:
                 return None
             logger.debug(f"Se obtuvo el anime {anime_id}")
             return _row_to_anime(row)
-        except ValueError as e:
-            logger.error(f"Error al obtener el anime {anime_id}: {e}", exc_info=True)
+        except ValueError:
             raise AnimeNotFoundError(anime_id)
         except Exception as e:
             logger.error(f"Error al obtener el anime {anime_id}: {e}", exc_info=True)
