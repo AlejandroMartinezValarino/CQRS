@@ -35,41 +35,23 @@ def get_pool_kwargs(
             # Parsear la URL (puede ser postgresql:// o postgres://)
             parsed = urlparse(database_url)
             
-            # Filtrar parámetros no válidos de la query string
-            # asyncpg no acepta connect_timeout, max_queries, max_inactive_connection_lifetime
-            # como parámetros de query string
-            invalid_params = {'connect_timeout', 'max_queries', 'max_inactive_connection_lifetime'}
+            # Extraer componentes de la URL y usar parámetros individuales
+            # Esto evita que asyncpg parse la DSN y extraiga parámetros inválidos de la query string
+            kwargs['host'] = parsed.hostname or settings.POSTGRES_HOST
+            kwargs['port'] = parsed.port or settings.POSTGRES_PORT
+            kwargs['user'] = parsed.username or settings.POSTGRES_USER
+            kwargs['password'] = parsed.password or settings.POSTGRES_PASSWORD
             
-            if parsed.query:
-                query_params = parse_qs(parsed.query, keep_blank_values=True)
-                # Filtrar parámetros no válidos
-                filtered_params = {
-                    k: v for k, v in query_params.items() 
-                    if k.lower() not in invalid_params
-                }
-                # Reconstruir query string sin los parámetros inválidos
-                if filtered_params:
-                    new_query = urlencode(filtered_params, doseq=True)
-                else:
-                    new_query = ''
-                parsed = parsed._replace(query=new_query)
-            
-            # Si se especifica una base de datos diferente, modificar el path
-            if database:
-                # Construir nueva URL con la base de datos especificada
-                new_path = f'/{database}'
-                parsed = parsed._replace(path=new_path)
-            
-            # Reconstruir la URL sin parámetros inválidos
-            dsn = urlunparse(parsed)
-            kwargs['dsn'] = dsn
+            # Determinar la base de datos
+            db_name = database or (parsed.path.lstrip('/') if parsed.path else settings.POSTGRES_DB)
+            kwargs['database'] = db_name
             
         except Exception:
             # Si hay error parseando DATABASE_URL, usar variables individuales
             pass
     
-    # Si no se usó DATABASE_URL, usar variables individuales
-    if 'dsn' not in kwargs:
+    # Si no se usó DATABASE_URL (no hay 'host' en kwargs), usar variables individuales
+    if 'host' not in kwargs:
         kwargs['host'] = settings.POSTGRES_HOST
         kwargs['port'] = settings.POSTGRES_PORT
         kwargs['user'] = settings.POSTGRES_USER
@@ -85,5 +67,11 @@ def get_pool_kwargs(
         kwargs['command_timeout'] = command_timeout
     elif hasattr(settings, 'POSTGRES_COMMAND_TIMEOUT'):
         kwargs['command_timeout'] = settings.POSTGRES_COMMAND_TIMEOUT
+    
+    # Asegurarse de que no se pasen parámetros inválidos a asyncpg
+    # Estos parámetros no son soportados por asyncpg.create_pool
+    invalid_kwargs = {'connect_timeout', 'max_queries', 'max_inactive_connection_lifetime', 'server_settings'}
+    for invalid_key in invalid_kwargs:
+        kwargs.pop(invalid_key, None)
     
     return kwargs
