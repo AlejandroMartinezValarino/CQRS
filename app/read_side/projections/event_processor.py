@@ -87,6 +87,19 @@ class EventProcessor:
                 f"Evento inválido: faltan campos requeridos: {missing_fields}"
             )
     
+    def _parse_ts(self, value: Any) -> datetime:
+        """Convierte strings ISO a datetime para inserción en DB."""
+        if isinstance(value, datetime):
+            return value
+        if isinstance(value, str):
+            try:
+                if value.endswith("Z"):
+                    value = value.replace("Z", "+00:00")
+                return datetime.fromisoformat(value)
+            except Exception as e:
+                raise EventProcessingError(f"Timestamp inválido: {value}") from e
+        raise EventProcessingError(f"Timestamp inválido: {value}")
+    
     @retry_async(max_attempts=3, exceptions=(asyncpg.PostgresError,))
     async def process_click_event(self, event: Dict[str, Any]):
         """Procesa un evento de click con validación e idempotencia."""
@@ -104,7 +117,7 @@ class EventProcessor:
         try:
             anime_id = event["anime_id"]
             user_id = event["user_id"]
-            occurred_at = event["occurred_at"]
+            occurred_at = self._parse_ts(event["occurred_at"])
             
             async with self._pool.acquire() as conn:
                 async with conn.transaction():
@@ -166,7 +179,7 @@ class EventProcessor:
             anime_id = event["anime_id"]
             user_id = event["user_id"]
             duration_seconds = event["duration_seconds"]
-            occurred_at = event["occurred_at"]
+            occurred_at = self._parse_ts(event["occurred_at"])
             
             if duration_seconds < 0:
                 raise EventProcessingError(f"duration_seconds debe ser positivo, recibido: {duration_seconds}")
@@ -233,7 +246,7 @@ class EventProcessor:
             anime_id = event["anime_id"]
             user_id = event["user_id"]
             rating = float(event["rating"])
-            occurred_at = event["occurred_at"]
+            occurred_at = self._parse_ts(event["occurred_at"])
             
             if not (1.0 <= rating <= 10.0):
                 raise EventProcessingError(f"Rating debe estar entre 1.0 y 10.0, recibido: {rating}")

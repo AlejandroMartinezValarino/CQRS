@@ -237,3 +237,56 @@ class ReadModelRepository:
         except Exception as e:
             logger.error(f"Error obteniendo anime {anime_id}: {e}", exc_info=True)
             raise
+
+    @retry_async(max_attempts=3, exceptions=(asyncpg.PostgresError,))
+    async def get_trending_animes(self, days: int = 7, limit: int = 10) -> List[dict]:
+        """Obtiene animes en tendencia combinando clicks, views y ratings recientes."""
+        try:
+            if not self._pool:
+                raise RuntimeError("Repository no está conectado. Llama a connect() primero.")
+            
+            self._validate_limit(limit)
+            
+            async with self._pool.acquire() as conn:
+                rows = await conn.fetch("""
+                    SELECT 
+                        a.myanimelist_id,
+                        a.title,
+                        a.description,
+                        a.image,
+                        a.type,
+                        a.episodes,
+                        a.score,
+                        a.popularity,
+                        a.genres,
+                        COALESCE(recent.clicks, 0) + COALESCE(recent.views, 0) + COALESCE(recent.ratings, 0) as total_interactions,
+                        COALESCE(s.total_clicks, 0) as total_clicks,
+                        COALESCE(s.total_views, 0) as total_views,
+                        COALESCE(s.total_ratings, 0) as total_ratings,
+                        s.average_rating
+                    FROM animes a
+                    LEFT JOIN anime_stats s ON a.myanimelist_id = s.anime_id
+                    LEFT JOIN (
+                        SELECT 
+                            anime_id,
+                            COUNT(*) FILTER (WHERE last_click_at >= NOW() - make_interval(days => $2)) as clicks,
+                            COUNT(*) FILTER (WHERE last_view_at >= NOW() - make_interval(days => $2)) as views,
+                            COUNT(*) FILTER (WHERE rated_at >= NOW() - make_interval(days => $2)) as ratings
+                        FROM (
+                            SELECT anime_id, last_click_at, NULL::timestamp as last_view_at, NULL::timestamp as rated_at FROM anime_clicks
+                            UNION ALL
+                            SELECT anime_id, NULL::timestamp, last_view_at, NULL::timestamp FROM anime_views
+                            UNION ALL
+                            SELECT anime_id, NULL::timestamp, NULL::timestamp, rated_at FROM anime_ratings
+                        ) agg
+                        GROUP BY anime_id
+                    ) recent ON a.myanimelist_id = recent.anime_id
+                    WHERE recent.clicks IS NOT NULL OR recent.views IS NOT NULL OR recent.ratings IS NOT NULL
+                    ORDER BY total_interactions DESC, s.total_views DESC
+                    LIMIT $1
+                """, limit, days)
+                return [dict(row) for row in rows]
+                
+        except Exception as e:
+            logger.error(f"Error obteniendo trending animes: {e}", exc_info=True)
+            raise
