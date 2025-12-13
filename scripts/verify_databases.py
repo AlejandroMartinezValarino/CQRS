@@ -7,6 +7,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from config.settings import settings
+from common.utils.db import get_pool_kwargs
 import asyncpg
 
 
@@ -31,15 +32,11 @@ async def check_databases():
         print("-" * 60)
         
         try:
-            # Conectar directamente a la base de datos
-            conn = await asyncpg.connect(
-                host=settings.POSTGRES_HOST,
-                port=settings.POSTGRES_PORT,
-                user=settings.POSTGRES_USER,
-                password=settings.POSTGRES_PASSWORD,
-                database=db_name,
-                timeout=10
-            )
+            # Usar get_pool_kwargs como los servicios
+            pool_kwargs = get_pool_kwargs(database=db_name)
+            
+            # Conectar usando los mismos parámetros que los servicios
+            conn = await asyncpg.connect(**pool_kwargs, timeout=10)
             
             try:
                 print(f"✅ Conexión exitosa a '{db_name}'")
