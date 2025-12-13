@@ -56,6 +56,34 @@ class Settings(BaseSettings):
         description="Orígenes permitidos para CORS"
     )
     
+    @validator("ALLOWED_ORIGINS", pre=True)
+    def parse_allowed_origins(cls, v):
+        """Parsea ALLOWED_ORIGINS desde JSON o string separado por comas."""
+        # Si no hay valor o está vacío, retornar None para usar default_factory
+        if v is None:
+            return None
+        if isinstance(v, str):
+            # Si está vacío, retornar None para usar default_factory
+            if not v.strip():
+                return None
+            # Intentar parsear como JSON
+            try:
+                import json
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+                # Si es un string JSON pero no una lista, retornar None
+                return None
+            except (json.JSONDecodeError, ValueError):
+                # Si no es JSON válido, tratar como string separado por comas
+                origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+                return origins if origins else None
+        # Si ya es una lista, retornarla
+        if isinstance(v, list):
+            return v
+        # Para cualquier otro tipo, retornar None para usar default_factory
+        return None
+    
     # Monitoring
     ENABLE_METRICS: bool = Field(default=True, description="Habilitar métricas")
     METRICS_PORT: int = Field(default=9090, ge=1, le=65535, description="Puerto para métricas")
