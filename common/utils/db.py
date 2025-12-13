@@ -36,11 +36,7 @@ def get_pool_kwargs(
             parsed = urlparse(database_url)
             
             # Extraer componentes de la URL y usar parámetros individuales
-<<<<<<< HEAD
-            # Esto evita que asyncpg parse la DSN y extraiga parámetros inválidos
-=======
             # Esto evita que asyncpg parse la DSN y extraiga parámetros inválidos de la query string
->>>>>>> 0ccd35a (Fix: Usar parámetros individuales en lugar de DSN para evitar connect_timeout en asyncpg)
             kwargs['host'] = parsed.hostname or settings.POSTGRES_HOST
             kwargs['port'] = parsed.port or settings.POSTGRES_PORT
             kwargs['user'] = parsed.username or settings.POSTGRES_USER
