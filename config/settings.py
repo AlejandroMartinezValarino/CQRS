@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     POSTGRES_MAX_CONNECTIONS: int = Field(default=20, ge=1, le=100, description="Máximo de conexiones en el pool")
     POSTGRES_MIN_CONNECTIONS: int = Field(default=5, ge=1, description="Mínimo de conexiones en el pool")
     POSTGRES_COMMAND_TIMEOUT: int = Field(default=30, ge=1, description="Timeout de comandos en segundos")
+    POSTGRES_CONNECT_TIMEOUT: int = Field(default=10, ge=1, description="Timeout para establecer conexión en segundos")
+    POSTGRES_MAX_QUERIES: int = Field(default=50000, ge=1, description="Máximo de consultas por conexión antes de reciclar")
+    POSTGRES_MAX_INACTIVE_CONNECTION_LIFETIME: int = Field(default=300, ge=1, description="Tiempo máximo de inactividad de conexión en segundos")
     
     # Database - Event Store
     POSTGRES_EVENT_STORE_DB: str = Field(default="cqrs_event_store", description="Base de datos del Event Store")
