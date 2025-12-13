@@ -16,10 +16,10 @@ app = FastAPI(
     docs_url="/graphql/docs" if not settings.is_production else None,
 )
 
-if settings.ALLOWED_ORIGINS:
+if settings.allowed_origins_list:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_origins=settings.allowed_origins_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -65,20 +65,20 @@ async def health():
     
     try:
         repo = get_repository()
-        # Verificar solo conectividad, no hacer query pesada
-        if repo._pool and not repo._pool._closed:
-            health_status["dependencies"] = {
-                "database": "healthy"
-            }
-        else:
-            raise Exception("Pool not connected")
+        test_query = await repo.get_anime_stats(1)
+        health_status["dependencies"] = {
+            "database": "healthy"
+        }
     except Exception as e:
-        logger.warning(f"Health check falló: {e}")
-        health_status["status"] = "degraded"
+        logger.error(f"Health check falló: {e}")
+        health_status["status"] = "unhealthy"
         health_status["dependencies"] = {
             "database": "unhealthy"
         }
-        # Retornar 200 en lugar de 503 para que Railway no marque el servicio como caído
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=health_status
+        )
     
     return health_status
 
