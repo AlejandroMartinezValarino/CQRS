@@ -60,6 +60,16 @@ echo ""
 echo "📦 Configurando rama consumer..."
 git checkout main || git checkout master
 git checkout -b consumer 2>/dev/null || git checkout consumer
+# Asegurar que el script corregido run_kafka_consumer.py esté presente
+if [ -f "scripts/run_kafka_consumer.py" ]; then
+    # Verificar que tiene el fix del PYTHONPATH
+    if ! grep -q "sys.path.insert" scripts/run_kafka_consumer.py; then
+        echo "⚠️  El script run_kafka_consumer.py no tiene el fix, actualizando..."
+        # El script ya debería estar corregido en main, pero por si acaso
+        git checkout main -- scripts/run_kafka_consumer.py 2>/dev/null || true
+    fi
+    echo "✅ Script run_kafka_consumer.py corregido presente"
+fi
 # Renombrar Dockerfile.consumer a Dockerfile
 if [ -f "Dockerfile.consumer" ] && [ ! -f "Dockerfile" ]; then
     mv Dockerfile.consumer Dockerfile
@@ -73,7 +83,7 @@ cp railway.consumer.json railway.json
 # Actualizar railway.json para apuntar a Dockerfile
 sed -i 's/Dockerfile\.consumer/Dockerfile/g' railway.json
 git add -A
-git commit -m "Configurar rama consumer: solo Dockerfile" || true
+git commit -m "Configurar rama consumer: solo Dockerfile + script corregido" || true
 echo "💡 Para hacer push: git push -u origin consumer"
 
 # 4. Frontend (ya tiene su Dockerfile en frontend/)
@@ -81,11 +91,14 @@ echo ""
 echo "📦 Configurando rama frontend..."
 git checkout main || git checkout master
 git checkout -b frontend 2>/dev/null || git checkout frontend
-# Eliminar Dockerfiles de la raíz (frontend tiene el suyo en frontend/)
-[ -f "Dockerfile.command" ] && rm Dockerfile.command && echo "🗑️  Eliminado Dockerfile.command"
-[ -f "Dockerfile.read" ] && rm Dockerfile.read && echo "🗑️  Eliminado Dockerfile.read"
-[ -f "Dockerfile.consumer" ] && rm Dockerfile.consumer && echo "🗑️  Eliminado Dockerfile.consumer"
-[ -f "Dockerfile" ] && rm Dockerfile && echo "🗑️  Eliminado Dockerfile de la raíz"
+# Eliminar TODOS los Dockerfiles de la raíz (frontend tiene el suyo en frontend/)
+echo "🗑️  Eliminando Dockerfiles de la raíz..."
+[ -f "Dockerfile.command" ] && rm Dockerfile.command && echo "   ✓ Eliminado Dockerfile.command"
+[ -f "Dockerfile.read" ] && rm Dockerfile.read && echo "   ✓ Eliminado Dockerfile.read"
+[ -f "Dockerfile.consumer" ] && rm Dockerfile.consumer && echo "   ✓ Eliminado Dockerfile.consumer"
+[ -f "Dockerfile" ] && rm Dockerfile && echo "   ✓ Eliminado Dockerfile de la raíz"
+# También eliminar railway.json de la raíz si existe
+[ -f "railway.json" ] && rm railway.json && echo "   ✓ Eliminado railway.json de la raíz"
 # Verificar que frontend/railway.json existe
 if [ -f "frontend/railway.json" ]; then
     echo "✅ frontend/railway.json ya existe"
@@ -102,10 +115,8 @@ else
 EOF
     git add frontend/railway.json
 fi
-# Eliminar railway.json de la raíz si existe (frontend usa frontend/railway.json)
-[ -f "railway.json" ] && rm railway.json && echo "🗑️  Eliminado railway.json de la raíz"
 git add -A
-git commit -m "Configurar rama frontend: solo frontend/Dockerfile" || true
+git commit -m "Configurar rama frontend: eliminar Dockerfiles de raíz, solo frontend/Dockerfile" || true
 echo "💡 Para hacer push: git push -u origin frontend"
 
 # Volver a main
