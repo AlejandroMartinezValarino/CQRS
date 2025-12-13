@@ -356,9 +356,9 @@ class ReadModelRepository:
                     LEFT JOIN (
                         SELECT 
                             anime_id,
-                            COUNT(*) FILTER (WHERE last_click_at >= NOW() - ($2 || ' days')::interval) as clicks,
-                            COUNT(*) FILTER (WHERE last_view_at >= NOW() - ($2 || ' days')::interval) as views,
-                            COUNT(*) FILTER (WHERE rated_at >= NOW() - ($2 || ' days')::interval) as ratings
+                            COUNT(*) FILTER (WHERE last_click_at >= NOW() - make_interval(days => $2)) as clicks,
+                            COUNT(*) FILTER (WHERE last_view_at >= NOW() - make_interval(days => $2)) as views,
+                            COUNT(*) FILTER (WHERE rated_at >= NOW() - make_interval(days => $2)) as ratings
                         FROM (
                             SELECT anime_id, last_click_at, NULL::timestamp as last_view_at, NULL::timestamp as rated_at FROM anime_clicks
                             UNION ALL
