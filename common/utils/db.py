@@ -53,9 +53,20 @@ def get_pool_kwargs(
                 # Parsear la URL (puede ser postgresql:// o postgres://)
                 parsed = urlparse(database_url)
                 
+                hostname = parsed.hostname
+                
+                # En Railway, postgres.railway.internal puede no resolverse
+                # Intentar usar localhost si estamos en Railway y el hostname es .railway.internal
+                if hostname and hostname.endswith('.railway.internal'):
+                    # En Railway, los servicios en la misma red privada pueden usar localhost
+                    # o el hostname puede necesitar ser resuelto de otra manera
+                    # Por ahora, intentaremos usar el hostname original
+                    # Si falla, el código que llama puede intentar con localhost
+                    pass
+                
                 # Extraer componentes de la URL y usar parámetros individuales
                 # Esto evita que asyncpg parse la DSN y extraiga parámetros inválidos de la query string
-                kwargs['host'] = parsed.hostname or settings.POSTGRES_HOST
+                kwargs['host'] = hostname or settings.POSTGRES_HOST
                 kwargs['port'] = parsed.port or settings.POSTGRES_PORT
                 kwargs['user'] = parsed.username or settings.POSTGRES_USER
                 kwargs['password'] = parsed.password or settings.POSTGRES_PASSWORD

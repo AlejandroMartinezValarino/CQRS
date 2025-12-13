@@ -13,30 +13,51 @@ import asyncpg
 
 async def create_database_if_not_exists(db_name: str):
     """Crea una base de datos si no existe."""
-    try:
-        # Conectarse a la base de datos 'postgres' (siempre existe)
-        pool_kwargs = get_pool_kwargs(database='postgres')
-        conn = await asyncpg.connect(**pool_kwargs)
-        
+    pool_kwargs = get_pool_kwargs(database='postgres')
+    original_host = pool_kwargs.get('host')
+    
+    # Lista de hostnames a intentar (útil para Railway)
+    hosts_to_try = [original_host]
+    if original_host and original_host.endswith('.railway.internal'):
+        # En Railway, intentar también con localhost
+        hosts_to_try.append('localhost')
+        # También intentar con 127.0.0.1
+        hosts_to_try.append('127.0.0.1')
+    
+    last_error = None
+    for host in hosts_to_try:
         try:
-            # Verificar si la base de datos existe
-            exists = await conn.fetchval(
-                "SELECT 1 FROM pg_database WHERE datname = $1", db_name
-            )
+            # Conectarse a la base de datos 'postgres' (siempre existe)
+            test_kwargs = pool_kwargs.copy()
+            test_kwargs['host'] = host
+            print(f"Intentando conectar a: {host}:{test_kwargs.get('port')}")
             
-            if exists:
-                print(f"✓ Base de datos '{db_name}' ya existe")
-                return True
-            else:
-                # Crear la base de datos
-                await conn.execute(f'CREATE DATABASE "{db_name}"')
-                print(f"✓ Base de datos '{db_name}' creada exitosamente")
-                return True
-        finally:
-            await conn.close()
-    except Exception as e:
-        print(f"✗ Error creando base de datos '{db_name}': {e}")
-        return False
+            conn = await asyncpg.connect(**test_kwargs)
+            
+            try:
+                # Verificar si la base de datos existe
+                exists = await conn.fetchval(
+                    "SELECT 1 FROM pg_database WHERE datname = $1", db_name
+                )
+                
+                if exists:
+                    print(f"✓ Base de datos '{db_name}' ya existe")
+                    return True
+                else:
+                    # Crear la base de datos
+                    await conn.execute(f'CREATE DATABASE "{db_name}"')
+                    print(f"✓ Base de datos '{db_name}' creada exitosamente")
+                    return True
+            finally:
+                await conn.close()
+        except Exception as e:
+            last_error = e
+            print(f"  ✗ Falló con {host}: {e}")
+            continue
+    
+    # Si todos los intentos fallaron
+    print(f"✗ Error creando base de datos '{db_name}': {last_error}")
+    return False
 
 
 async def main():
