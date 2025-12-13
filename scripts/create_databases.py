@@ -13,29 +13,31 @@ import asyncpg
 
 async def create_database_if_not_exists(db_name: str):
     """Crea una base de datos si no existe."""
+    import socket
+    from urllib.parse import urlparse, urlunparse
+    
     pool_kwargs = get_pool_kwargs(database='postgres')
     original_host = pool_kwargs.get('host')
     
-    # Lista de hostnames a intentar (útil para Railway)
-    hosts_to_try = [original_host]
-    if original_host and original_host.endswith('.railway.internal'):
-        # En Railway, intentar también con localhost
-        hosts_to_try.append('localhost')
-        # También intentar con 127.0.0.1
-        hosts_to_try.append('127.0.0.1')
-    
-    last_error = None
-    for host in hosts_to_try:
+    # Primero intentar usar DATABASE_URL directamente como DSN (asyncpg puede resolver mejor)
+    database_url = getattr(settings, 'DATABASE_URL', None)
+    if database_url and not database_url.startswith("${{"):
         try:
-            # Conectarse a la base de datos 'postgres' (siempre existe)
-            test_kwargs = pool_kwargs.copy()
-            test_kwargs['host'] = host
-            print(f"Intentando conectar a: {host}:{test_kwargs.get('port')}")
-            
-            conn = await asyncpg.connect(**test_kwargs)
+            # Modificar DATABASE_URL para apuntar a la base de datos 'postgres'
+            parsed = urlparse(database_url)
+            # Cambiar el path para usar 'postgres'
+            modified_url = urlunparse((
+                parsed.scheme,
+                parsed.netloc,
+                '/postgres',  # Conectar a la BD 'postgres'
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+            print(f"Intentando conectar usando DATABASE_URL directamente...")
+            conn = await asyncpg.connect(modified_url)
             
             try:
-                # Verificar si la base de datos existe
                 exists = await conn.fetchval(
                     "SELECT 1 FROM pg_database WHERE datname = $1", db_name
                 )
@@ -44,7 +46,51 @@ async def create_database_if_not_exists(db_name: str):
                     print(f"✓ Base de datos '{db_name}' ya existe")
                     return True
                 else:
-                    # Crear la base de datos
+                    await conn.execute(f'CREATE DATABASE "{db_name}"')
+                    print(f"✓ Base de datos '{db_name}' creada exitosamente")
+                    return True
+            finally:
+                await conn.close()
+        except Exception as e:
+            print(f"  ✗ Falló con DATABASE_URL: {str(e)[:100]}")
+    
+    # Si DATABASE_URL falla, intentar con parámetros individuales
+    hosts_to_try = []
+    
+    # Intentar resolver el hostname original a IP
+    if original_host and original_host.endswith('.railway.internal'):
+        try:
+            ip = socket.gethostbyname(original_host)
+            print(f"Resuelto {original_host} -> {ip}")
+            hosts_to_try.append(ip)
+        except socket.gaierror:
+            print(f"No se pudo resolver {original_host}, intentando alternativas...")
+            hosts_to_try.append('localhost')
+            hosts_to_try.append('127.0.0.1')
+    else:
+        hosts_to_try.append(original_host)
+    
+    if original_host and original_host not in hosts_to_try:
+        hosts_to_try.insert(0, original_host)
+    
+    last_error = None
+    for host in hosts_to_try:
+        try:
+            test_kwargs = pool_kwargs.copy()
+            test_kwargs['host'] = host
+            print(f"Intentando conectar a: {host}:{test_kwargs.get('port')}")
+            
+            conn = await asyncpg.connect(**test_kwargs)
+            
+            try:
+                exists = await conn.fetchval(
+                    "SELECT 1 FROM pg_database WHERE datname = $1", db_name
+                )
+                
+                if exists:
+                    print(f"✓ Base de datos '{db_name}' ya existe")
+                    return True
+                else:
                     await conn.execute(f'CREATE DATABASE "{db_name}"')
                     print(f"✓ Base de datos '{db_name}' creada exitosamente")
                     return True
@@ -52,11 +98,15 @@ async def create_database_if_not_exists(db_name: str):
                 await conn.close()
         except Exception as e:
             last_error = e
-            print(f"  ✗ Falló con {host}: {e}")
+            error_msg = str(e)
+            if len(error_msg) > 100:
+                error_msg = error_msg[:100] + "..."
+            print(f"  ✗ Falló con {host}: {error_msg}")
             continue
     
-    # Si todos los intentos fallaron
     print(f"✗ Error creando base de datos '{db_name}': {last_error}")
+    print(f"\n⚠ Sugerencia: Verifica en Railway que el servicio PostgreSQL esté correctamente conectado")
+    print(f"   y que esté en la misma red privada que este servicio.")
     return False
 
 
