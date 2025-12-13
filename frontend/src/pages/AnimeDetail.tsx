@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Row, Col, Statistic, Button, Spin, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Button, Empty } from 'antd';
 import { ArrowLeftOutlined, EyeOutlined, LikeOutlined, StarOutlined } from '@ant-design/icons';
 import { useAnime, useAnimeStats } from '@/hooks/useGraphQL';
 import { Loading } from '@/components/common/Loading';
