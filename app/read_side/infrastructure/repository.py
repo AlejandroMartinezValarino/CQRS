@@ -5,7 +5,6 @@ from config.settings import settings
 from common.utils.logger import get_logger
 from common.utils.retry import retry_async
 from common.utils.cache import InMemoryCache
-from common.utils.db import get_pool_kwargs
 from common.exceptions import AnimeNotFoundError
 
 
@@ -25,13 +24,16 @@ class ReadModelRepository:
     async def connect(self):
         """Crea el pool de conexiones con configuración optimizada."""
         try:
-            pool_kwargs = get_pool_kwargs(
+            self._pool = await asyncpg.create_pool(
+                host=settings.POSTGRES_HOST,
+                port=settings.POSTGRES_PORT,
+                user=settings.POSTGRES_USER,
+                password=settings.POSTGRES_PASSWORD,
                 database=settings.POSTGRES_DB,
                 min_size=settings.POSTGRES_MIN_CONNECTIONS,
                 max_size=settings.POSTGRES_MAX_CONNECTIONS,
                 command_timeout=settings.POSTGRES_COMMAND_TIMEOUT,
             )
-            self._pool = await asyncpg.create_pool(**pool_kwargs)
             logger.info("Pool de conexiones del ReadModelRepository creado correctamente")
         except Exception as e:
             logger.error(f"Error creando pool de conexiones: {e}", exc_info=True)

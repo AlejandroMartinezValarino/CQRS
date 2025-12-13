@@ -5,7 +5,6 @@ from datetime import datetime
 from common.events.anime_events import ClickRegistered, ViewRegistered, RatingGiven
 from common.utils.logger import get_logger
 from common.utils.retry import retry_async
-from common.utils.db import get_pool_kwargs
 from common.exceptions import DomainException
 from config.settings import settings
 
@@ -26,13 +25,15 @@ class EventProcessor:
     async def connect(self):
         """Crea el pool de conexiones."""
         try:
-            pool_kwargs = get_pool_kwargs(
+            self._pool = await asyncpg.create_pool(
+                host=settings.POSTGRES_HOST,
+                port=settings.POSTGRES_PORT,
+                user=settings.POSTGRES_USER,
+                password=settings.POSTGRES_PASSWORD,
                 database=settings.POSTGRES_DB,
                 min_size=2,
                 max_size=10,
-                command_timeout=settings.POSTGRES_COMMAND_TIMEOUT,
             )
-            self._pool = await asyncpg.create_pool(**pool_kwargs)
             logger.info("Pool de conexiones del EventProcessor creado correctamente")
         except Exception as e:
             logger.error(f"Error creando pool de conexiones: {e}", exc_info=True)

@@ -4,7 +4,6 @@ import asyncpg
 import json
 from datetime import datetime
 from common.utils.logger import get_logger
-from common.utils.db import get_pool_kwargs
 from config.settings import settings
 
 logger = get_logger(__name__)
@@ -19,13 +18,15 @@ class DLQHandler:
     async def connect(self):
         """Crea el pool de conexiones."""
         try:
-            pool_kwargs = get_pool_kwargs(
+            self._pool = await asyncpg.create_pool(
+                host=settings.POSTGRES_HOST,
+                port=settings.POSTGRES_PORT,
+                user=settings.POSTGRES_USER,
+                password=settings.POSTGRES_PASSWORD,
                 database=settings.POSTGRES_DB,
                 min_size=1,
                 max_size=5,
-                command_timeout=settings.POSTGRES_COMMAND_TIMEOUT,
             )
-            self._pool = await asyncpg.create_pool(**pool_kwargs)
             logger.info("Pool de conexiones del DLQHandler creado correctamente")
         except Exception as e:
             logger.error(f"Error creando pool de conexiones DLQ: {e}", exc_info=True)
@@ -33,7 +34,7 @@ class DLQHandler:
     
     async def close(self):
         """Cierra el pool."""
-        if self._pool and not self._pool.is_closing():
+        if self._pool:
             try:
                 await self._pool.close()
                 logger.info("Pool de conexiones del DLQHandler cerrado")
