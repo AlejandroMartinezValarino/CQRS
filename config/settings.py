@@ -1,9 +1,8 @@
 """Configuración de la aplicación con validación para producción."""
 import os
-import json
-from pydantic import Field, field_validator, model_validator, computed_field
+from pydantic import Field, validator
 from pydantic_settings import BaseSettings
-from typing import Optional, Union
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -15,7 +14,6 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", description="Nivel de logging: DEBUG, INFO, WARNING, ERROR")
     
     # Database - Read Model
-    DATABASE_URL: Optional[str] = Field(default=None, description="URL completa de conexión a PostgreSQL (opcional)")
     POSTGRES_HOST: str = Field(default="localhost", description="Host de PostgreSQL")
     POSTGRES_PORT: int = Field(default=5432, ge=1, le=65535, description="Puerto de PostgreSQL")
     POSTGRES_USER: str = Field(default="Molkiu", description="Usuario de PostgreSQL")
@@ -24,9 +22,6 @@ class Settings(BaseSettings):
     POSTGRES_MAX_CONNECTIONS: int = Field(default=20, ge=1, le=100, description="Máximo de conexiones en el pool")
     POSTGRES_MIN_CONNECTIONS: int = Field(default=5, ge=1, description="Mínimo de conexiones en el pool")
     POSTGRES_COMMAND_TIMEOUT: int = Field(default=30, ge=1, description="Timeout de comandos en segundos")
-    POSTGRES_CONNECT_TIMEOUT: int = Field(default=10, ge=1, description="Timeout para establecer conexión en segundos")
-    POSTGRES_MAX_QUERIES: int = Field(default=50000, ge=1, description="Máximo de consultas por conexión antes de reciclar")
-    POSTGRES_MAX_INACTIVE_CONNECTION_LIFETIME: int = Field(default=300, ge=1, description="Tiempo máximo de inactividad de conexión en segundos")
     
     # Database - Event Store
     POSTGRES_EVENT_STORE_DB: str = Field(default="cqrs_event_store", description="Base de datos del Event Store")
@@ -53,70 +48,52 @@ class Settings(BaseSettings):
     GRAPHQL_WORKERS: int = Field(default=4, ge=1, le=32, description="Número de workers")
     
     # Security
-    # Usamos str para evitar el parseo automático como JSON por Pydantic Settings
-    allowed_origins_raw: Optional[str] = Field(default=None, alias="ALLOWED_ORIGINS", exclude=True)
+    ALLOWED_ORIGINS: Optional[str] = Field(
+        default=None,
+        description="Orígenes permitidos para CORS (JSON array o string separado por comas)"
+    )
     
-    @field_validator("allowed_origins_raw", mode="before")
-    @classmethod
-    def intercept_allowed_origins(cls, v: Union[str, list, None]) -> Optional[str]:
-        """Intercepta el valor antes del parseo JSON y lo mantiene como string."""
-        # Si es None, retornar None
-        if v is None:
-            return None
+    @validator("ALLOWED_ORIGINS", pre=True)
+    def parse_allowed_origins(cls, v):
+        """Parse ALLOWED_ORIGINS desde diferentes formatos."""
+        # Si es None o vacío, retornar valor por defecto
+        if not v or (isinstance(v, str) and not v.strip()):
+            env = os.getenv("ENVIRONMENT", "development")
+            if env != "production":
+                return "*"
+            else:
+                return "https://cqrs.alejandrotech.eu,https://www.cqrs.alejandrotech.eu"
         
-        # Si ya es una lista (fue parseado como JSON), convertir a string JSON
+        # Si ya es una lista, convertir a string
         if isinstance(v, list):
-            return json.dumps(v)
+            return ",".join(v)
         
-        # Si es un string, retornarlo tal cual
-        if isinstance(v, str):
-            return v
-        
-        return None
-    
-    @field_validator("allowed_origins_raw", mode="after")
-    @classmethod
-    def normalize_allowed_origins(cls, v: Optional[str]) -> Optional[str]:
-        """Normaliza el valor: si está vacío o es template no resuelto, retornar None."""
-        if v is None:
-            return None
-        v_stripped = v.strip()
-        # Si está vacío o es un template no resuelto, retornar None para usar default
-        if not v_stripped or v_stripped.startswith("${{"):
-            return None
         return v
     
-    @computed_field
     @property
-    def ALLOWED_ORIGINS(self) -> list[str]:
-        """Orígenes permitidos para CORS."""
-        # Si no hay valor, usar valores por defecto
-        if self.allowed_origins_raw is None:
-            env = getattr(self, 'ENVIRONMENT', os.getenv("ENVIRONMENT", "development"))
+    def allowed_origins_list(self) -> list[str]:
+        """Retorna ALLOWED_ORIGINS como lista."""
+        if not self.ALLOWED_ORIGINS:
+            env = os.getenv("ENVIRONMENT", "development")
             if env != "production":
                 return ["*"]
             else:
                 return ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
         
-        v_stripped = self.allowed_origins_raw.strip()
+        # Si es "*", retornar como lista
+        if self.ALLOWED_ORIGINS == "*":
+            return ["*"]
         
         # Intentar parsear como JSON
-        try:
-            parsed = json.loads(v_stripped)
-            if isinstance(parsed, list):
-                return parsed
-        except (json.JSONDecodeError, ValueError):
-            # Si no es JSON válido, tratar como string separado por comas
-            origins = [origin.strip() for origin in v_stripped.split(",") if origin.strip()]
-            if origins:
-                return origins
+        if self.ALLOWED_ORIGINS.strip().startswith("["):
+            try:
+                import json
+                return json.loads(self.ALLOWED_ORIGINS)
+            except:
+                pass
         
-        # Fallback a valores por defecto
-        env = getattr(self, 'ENVIRONMENT', os.getenv("ENVIRONMENT", "development"))
-        if env != "production":
-            return ["*"]
-        else:
-            return ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
+        # Tratar como string separado por comas
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
     
     # Monitoring
     ENABLE_METRICS: bool = Field(default=True, description="Habilitar métricas")
@@ -127,30 +104,28 @@ class Settings(BaseSettings):
     CACHE_DEFAULT_TTL: int = Field(default=300, ge=1, description="TTL por defecto en segundos (5 minutos)")
     CACHE_STATS_ENABLED: bool = Field(default=True, description="Habilitar estadísticas de caché")
 
-    @field_validator("ENVIRONMENT")
-    @classmethod
-    def validate_environment(cls, v: str) -> str:
+    @validator("ENVIRONMENT")
+    def validate_environment(cls, v):
         """Valida que el entorno sea válido."""
         allowed = ["development", "staging", "production"]
         if v not in allowed:
             raise ValueError(f"ENVIRONMENT debe ser uno de: {', '.join(allowed)}")
         return v
     
-    @field_validator("LOG_LEVEL")
-    @classmethod
-    def validate_log_level(cls, v: str) -> str:
+    @validator("LOG_LEVEL")
+    def validate_log_level(cls, v):
         """Valida que el nivel de log sea válido."""
         allowed = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         if v.upper() not in allowed:
             raise ValueError(f"LOG_LEVEL debe ser uno de: {', '.join(allowed)}")
         return v.upper()
     
-    @model_validator(mode='after')
-    def validate_password(self):
+    @validator("POSTGRES_PASSWORD")
+    def validate_password(cls, v, values):
         """Valida que la contraseña no sea la por defecto en producción."""
-        if self.ENVIRONMENT == "production" and self.POSTGRES_PASSWORD == "postgres":
+        if values.get("ENVIRONMENT") == "production" and v == "postgres":
             raise ValueError("No se puede usar la contraseña por defecto en producción")
-        return self
+        return v
     
     @property
     def is_production(self) -> bool:
@@ -162,12 +137,12 @@ class Settings(BaseSettings):
         """Indica si estamos en desarrollo."""
         return self.ENVIRONMENT == "development"
     
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "case_sensitive": True,
-        "validate_assignment": True,
-    }
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = True
+        # En producción, no permitir valores por defecto inseguros
+        validate_assignment = True
 
 
 settings = Settings()

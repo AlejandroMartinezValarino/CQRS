@@ -19,10 +19,10 @@ app = FastAPI(
     redoc_url="/redoc" if not settings.is_production else None,
 )
 
-if settings.ALLOWED_ORIGINS:
+if settings.allowed_origins_list:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.ALLOWED_ORIGINS,
+        allow_origins=settings.allowed_origins_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -147,28 +147,19 @@ async def health():
         "version": "1.0.0"
     }
     
-    try:
-        event_store_healthy = await command_handler.event_store.health_check()
-    except Exception as e:
-        logger.warning(f"Event store health check failed: {e}")
-        event_store_healthy = False
-    
-    try:
-        kafka_healthy = command_handler.kafka_producer.health_check()
-    except Exception as e:
-        logger.warning(f"Kafka health check failed: {e}")
-        kafka_healthy = False
-    
+    event_store_healthy = await command_handler.event_store.health_check()
+    kafka_healthy = command_handler.kafka_producer.health_check()
     health_status["dependencies"] = {
         "event_store": "healthy" if event_store_healthy else "unhealthy",
         "kafka": "healthy" if kafka_healthy else "unhealthy"
     }
     
-    # Solo marcar como no saludable si event_store falla (Kafka es opcional para health)
-    if not event_store_healthy:
+    if not event_store_healthy or not kafka_healthy:
         health_status["status"] = "degraded"
-        # Retornar 200 en lugar de 503 para que Railway no marque el servicio como caído
-        # Railway puede seguir enrutando tráfico incluso si hay dependencias degradadas
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content=health_status
+        )
     
     return health_status
 
