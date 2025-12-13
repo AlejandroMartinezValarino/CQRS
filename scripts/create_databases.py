@@ -41,9 +41,31 @@ async def create_database_if_not_exists(db_name: str):
 
 async def main():
     """Función principal."""
+    import os
+    
     print("Creando bases de datos...")
-    print(f"Host: {settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}")
-    print(f"Usuario: {settings.POSTGRES_USER}")
+    
+    # Verificar variables de entorno de Railway
+    pghost = os.getenv('PGHOST')
+    pgport = os.getenv('PGPORT')
+    pguser = os.getenv('PGUSER')
+    
+    if pghost:
+        print(f"Usando variables de Railway:")
+        print(f"  PGHOST: {pghost}")
+        print(f"  PGPORT: {pgport or 'N/A'}")
+        print(f"  PGUSER: {pguser or 'N/A'}")
+    else:
+        print(f"Usando configuración de settings:")
+        print(f"  Host: {settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}")
+        print(f"  Usuario: {settings.POSTGRES_USER}")
+    
+    # Mostrar parámetros que se usarán realmente
+    pool_kwargs = get_pool_kwargs(database='postgres')
+    print(f"\nParámetros de conexión:")
+    print(f"  Host: {pool_kwargs.get('host')}")
+    print(f"  Port: {pool_kwargs.get('port')}")
+    print(f"  User: {pool_kwargs.get('user')}")
     print()
     
     databases = [
