@@ -1,6 +1,7 @@
 """Utilidades para conexiones a base de datos."""
 from typing import Dict, Any, Optional
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+import os
 import asyncpg
 from config.settings import settings
 
@@ -14,8 +15,10 @@ def get_pool_kwargs(
     """
     Construye los parámetros para crear un pool de conexiones.
     
-    Si DATABASE_URL está disponible, la usa y modifica la base de datos si se especifica.
-    Si no, usa las variables individuales de configuración.
+    Prioridad:
+    1. Variables de entorno PGHOST, PGPORT, etc. (Railway las proporciona)
+    2. DATABASE_URL (si está disponible)
+    3. Variables individuales de configuración (settings)
     
     Args:
         database: Nombre de la base de datos (opcional, sobrescribe la del DATABASE_URL)
@@ -28,29 +31,44 @@ def get_pool_kwargs(
     """
     kwargs: Dict[str, Any] = {}
     
-    # Si DATABASE_URL está disponible y no es un template no resuelto, usarla
-    database_url = getattr(settings, 'DATABASE_URL', None)
-    if database_url and not database_url.startswith("${{"):
-        try:
-            # Parsear la URL (puede ser postgresql:// o postgres://)
-            parsed = urlparse(database_url)
-            
-            # Extraer componentes de la URL y usar parámetros individuales
-            # Esto evita que asyncpg parse la DSN y extraiga parámetros inválidos de la query string
-            kwargs['host'] = parsed.hostname or settings.POSTGRES_HOST
-            kwargs['port'] = parsed.port or settings.POSTGRES_PORT
-            kwargs['user'] = parsed.username or settings.POSTGRES_USER
-            kwargs['password'] = parsed.password or settings.POSTGRES_PASSWORD
-            
-            # Determinar la base de datos
-            db_name = database or (parsed.path.lstrip('/') if parsed.path else settings.POSTGRES_DB)
-            kwargs['database'] = db_name
-            
-        except Exception:
-            # Si hay error parseando DATABASE_URL, usar variables individuales
-            pass
+    # Prioridad 1: Variables de entorno de Railway (PGHOST, PGPORT, etc.)
+    # Railway proporciona estas variables cuando conectas un servicio PostgreSQL
+    pghost = os.getenv('PGHOST')
+    pgport = os.getenv('PGPORT')
+    pguser = os.getenv('PGUSER')
+    pgpassword = os.getenv('PGPASSWORD')
     
-    # Si no se usó DATABASE_URL (no hay 'host' en kwargs), usar variables individuales
+    if pghost:
+        kwargs['host'] = pghost
+        kwargs['port'] = int(pgport) if pgport else settings.POSTGRES_PORT
+        kwargs['user'] = pguser or settings.POSTGRES_USER
+        kwargs['password'] = pgpassword or settings.POSTGRES_PASSWORD
+        kwargs['database'] = database or settings.POSTGRES_DB
+    
+    # Prioridad 2: DATABASE_URL (si no se usaron variables PGHOST)
+    if 'host' not in kwargs:
+        database_url = getattr(settings, 'DATABASE_URL', None)
+        if database_url and not database_url.startswith("${{"):
+            try:
+                # Parsear la URL (puede ser postgresql:// o postgres://)
+                parsed = urlparse(database_url)
+                
+                # Extraer componentes de la URL y usar parámetros individuales
+                # Esto evita que asyncpg parse la DSN y extraiga parámetros inválidos de la query string
+                kwargs['host'] = parsed.hostname or settings.POSTGRES_HOST
+                kwargs['port'] = parsed.port or settings.POSTGRES_PORT
+                kwargs['user'] = parsed.username or settings.POSTGRES_USER
+                kwargs['password'] = parsed.password or settings.POSTGRES_PASSWORD
+                
+                # Determinar la base de datos
+                db_name = database or (parsed.path.lstrip('/') if parsed.path else settings.POSTGRES_DB)
+                kwargs['database'] = db_name
+                
+            except Exception:
+                # Si hay error parseando DATABASE_URL, usar variables individuales
+                pass
+    
+    # Prioridad 3: Variables individuales de configuración (fallback)
     if 'host' not in kwargs:
         kwargs['host'] = settings.POSTGRES_HOST
         kwargs['port'] = settings.POSTGRES_PORT

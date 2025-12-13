@@ -1,6 +1,7 @@
 """Script de depuración completo del sistema."""
 import asyncio
 import sys
+import os
 from pathlib import Path
 
 project_root = Path(__file__).parent.parent
@@ -99,8 +100,22 @@ async def main():
     print("DIAGNÓSTICO DEL SISTEMA CQRS")
     print("="*60)
     print(f"\nConfiguración:")
-    print(f"  Host: {settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}")
-    print(f"  Usuario: {settings.POSTGRES_USER}")
+    
+    # Verificar variables de entorno de Railway
+    pghost = os.getenv('PGHOST')
+    pgport = os.getenv('PGPORT')
+    pguser = os.getenv('PGUSER')
+    
+    if pghost:
+        print(f"  PGHOST (Railway): {pghost}:{pgport or 'N/A'}")
+        print(f"  PGUSER (Railway): {pguser or 'N/A'}")
+        print(f"  ✓ Usando variables de entorno de Railway")
+    else:
+        print(f"  PGHOST: No configurada")
+    
+    print(f"  Settings Host: {settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}")
+    print(f"  Settings Usuario: {settings.POSTGRES_USER}")
+    
     database_url = getattr(settings, 'DATABASE_URL', None)
     if database_url:
         # Ocultar contraseña
@@ -120,6 +135,14 @@ async def main():
             print(f"  DATABASE_URL: Configurada")
     else:
         print(f"  DATABASE_URL: No configurada (usando variables individuales)")
+    
+    # Mostrar qué parámetros se usarán realmente
+    pool_kwargs = get_pool_kwargs(database=settings.POSTGRES_DB)
+    print(f"\nParámetros de conexión que se usarán:")
+    print(f"  Host: {pool_kwargs.get('host')}")
+    print(f"  Port: {pool_kwargs.get('port')}")
+    print(f"  User: {pool_kwargs.get('user')}")
+    print(f"  Database: {pool_kwargs.get('database')}")
     
     databases = [
         (settings.POSTGRES_DB, "Read Model", [
