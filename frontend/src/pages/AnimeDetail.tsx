@@ -1,9 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Row, Col, Statistic, Button, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Button, Empty, Typography } from 'antd';
 import { ArrowLeftOutlined, EyeOutlined, LikeOutlined, StarOutlined } from '@ant-design/icons';
-import { useAnime, useAnimeStats } from '@/hooks/useGraphQL';
+import { useAnime, useAnimeStats, useRecommendedAnimes } from '@/hooks/useGraphQL';
 import { Loading } from '@/components/common/Loading';
+import { AnimeCard } from '@/components/anime/AnimeCard';
 import { formatNumber, formatDuration } from '@/utils';
+
+const { Title } = Typography;
 
 export const AnimeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +15,10 @@ export const AnimeDetail = () => {
 
   const { data: animeData, loading: animeLoading } = useAnime(animeId);
   const { data: statsData, loading: statsLoading } = useAnimeStats(animeId);
+  const { data: recommendationsData, loading: recommendationsLoading } = useRecommendedAnimes(
+    animeId,
+    6
+  );
 
   if (animeLoading || statsLoading) {
     return <Loading />;
@@ -82,7 +89,7 @@ export const AnimeDetail = () => {
       )}
 
       {stats && (
-        <Card title="Estadísticas">
+        <Card title="Estadísticas" style={{ marginBottom: '24px' }}>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={6}>
               <Statistic
@@ -121,6 +128,24 @@ export const AnimeDetail = () => {
                 value={formatDuration(stats.totalDurationSeconds)}
               />
             </Col>
+          </Row>
+        </Card>
+      )}
+
+      {recommendationsData?.recommendedAnimes && recommendationsData.recommendedAnimes.length > 0 && (
+        <Card
+          title={<Title level={4} style={{ margin: 0 }}>Animes Similares</Title>}
+          loading={recommendationsLoading}
+        >
+          <Row gutter={[16, 16]}>
+            {recommendationsData.recommendedAnimes.map((recAnime) => (
+              <Col key={recAnime.myanimelistId} xs={12} sm={8} md={6} lg={4}>
+                <AnimeCard
+                  anime={recAnime}
+                  onClick={() => navigate(`/animes/${recAnime.myanimelistId}`)}
+                />
+              </Col>
+            ))}
           </Row>
         </Card>
       )}

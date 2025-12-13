@@ -53,3 +53,75 @@ export const ANIME = gql`
     }
   }
 `;
+
+export const SEARCH_ANIMES = gql`
+  query SearchAnimes($page: Int!, $pageSize: Int!, $filters: AnimeFilters) {
+    searchAnimes(page: $page, pageSize: $pageSize, filters: $filters) {
+      items {
+        myanimelistId
+        title
+        description
+        image
+        type
+        episodes
+        score
+        popularity
+        genres
+        totalClicks
+        totalViews
+        totalRatings
+        averageRating
+      }
+      total
+      page
+      pageSize
+      hasMore
+    }
+  }
+`;
+
+export const TRENDING_ANIMES = gql`
+  query TrendingAnimes($limit: Int!, $days: Int) {
+    trendingAnimes(limit: $limit, days: $days) {
+      myanimelistId
+      title
+      description
+      image
+      type
+      episodes
+      score
+      popularity
+      genres
+      totalClicks
+      totalViews
+      totalRatings
+      averageRating
+    }
+  }
+`;
+
+export const RECOMMENDED_ANIMES = gql`
+  query RecommendedAnimes($basedOnAnimeId: Int!, $limit: Int!) {
+    recommendedAnimes(basedOnAnimeId: $basedOnAnimeId, limit: $limit) {
+      myanimelistId
+      title
+      description
+      image
+      type
+      episodes
+      score
+      popularity
+      genres
+      totalClicks
+      totalViews
+      totalRatings
+      averageRating
+    }
+  }
+`;
+
+export const GENRES = gql`
+  query Genres {
+    genres
+  }
+`;
