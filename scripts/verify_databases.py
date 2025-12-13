@@ -1,4 +1,4 @@
-"""Script para verificar el estado de las bases de datos."""
+"""Script para verificar el estado de las bases de datos en Railway."""
 import asyncio
 import sys
 from pathlib import Path
@@ -7,7 +7,6 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from config.settings import settings
-from common.utils.db import get_pool_kwargs
 import asyncpg
 
 
@@ -16,6 +15,11 @@ async def check_databases():
     print("="*60)
     print("VERIFICANDO BASES DE DATOS")
     print("="*60)
+    print(f"\nConexión PostgreSQL:")
+    print(f"  Host: {settings.POSTGRES_HOST}")
+    print(f"  Port: {settings.POSTGRES_PORT}")
+    print(f"  User: {settings.POSTGRES_USER}")
+    print()
     
     databases_to_check = [
         settings.POSTGRES_DB,
@@ -27,25 +31,21 @@ async def check_databases():
         print("-" * 60)
         
         try:
-            # Conectar a la base de datos
-            pool_kwargs = get_pool_kwargs(database=db_name)
-            pool = await asyncpg.create_pool(**pool_kwargs, min_size=1, max_size=2)
+            # Conectar directamente a la base de datos
+            conn = await asyncpg.connect(
+                host=settings.POSTGRES_HOST,
+                port=settings.POSTGRES_PORT,
+                user=settings.POSTGRES_USER,
+                password=settings.POSTGRES_PASSWORD,
+                database=db_name,
+                timeout=10
+            )
             
             try:
-                # Verificar existencia de la base de datos
-                exists = await pool.fetchval(
-                    "SELECT 1 FROM pg_database WHERE datname = $1", 
-                    db_name
-                )
-                
-                if exists:
-                    print(f"✅ Base de datos '{db_name}' existe")
-                else:
-                    print(f"❌ Base de datos '{db_name}' NO existe")
-                    continue
+                print(f"✅ Conexión exitosa a '{db_name}'")
                 
                 # Listar tablas
-                tables = await pool.fetch("""
+                tables = await conn.fetch("""
                     SELECT table_name 
                     FROM information_schema.tables 
                     WHERE table_schema = 'public'
@@ -57,7 +57,7 @@ async def check_databases():
                     for table in tables:
                         # Contar registros
                         try:
-                            count = await pool.fetchval(
+                            count = await conn.fetchval(
                                 f'SELECT COUNT(*) FROM "{table["table_name"]}"'
                             )
                             print(f"   - {table['table_name']}: {count} registros")
@@ -65,14 +65,19 @@ async def check_databases():
                             print(f"   - {table['table_name']}: error contando ({str(e)[:50]})")
                 else:
                     print("\n⚠️  No se encontraron tablas en esta base de datos")
+                    print("   (La base de datos existe pero está vacía)")
                 
             finally:
-                await pool.close()
+                await conn.close()
                 
+        except asyncpg.InvalidCatalogNameError:
+            print(f"❌ La base de datos '{db_name}' NO existe")
+            print(f"   Debe ser creada ejecutando: python scripts/create_databases.py")
+        except asyncpg.exceptions.InvalidPasswordError:
+            print(f"❌ Error de autenticación para '{db_name}'")
+            print(f"   Verifica las credenciales en las variables de entorno")
         except Exception as e:
-            print(f"❌ Error verificando '{db_name}': {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"❌ Error conectando a '{db_name}': {type(e).__name__}: {e}")
     
     print("\n" + "="*60)
     print("VERIFICACIÓN COMPLETADA")
@@ -80,4 +85,13 @@ async def check_databases():
 
 
 if __name__ == "__main__":
-    asyncio.run(check_databases())
+    try:
+        asyncio.run(check_databases())
+    except KeyboardInterrupt:
+        print("\n\nVerificación cancelada por el usuario")
+        sys.exit(0)
+    except Exception as e:
+        print(f"\n\n❌ Error fatal: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
