@@ -98,8 +98,41 @@ async def create_database_if_not_exists(db_name: str):
                         break
                     # Continuar con el siguiente intento
     
-    # Fallback: intentar con DATABASE_URL directamente y con hostname simplificado
-    database_url = getattr(settings, 'DATABASE_URL', None)
+    # Fallback: intentar con DATABASE_URL directamente, RAILWAY_PRIVATE_DOMAIN, o DATABASE_PUBLIC_URL
+    import os
+    database_url = getattr(settings, 'DATABASE_URL', None) or os.getenv('DATABASE_URL')
+    
+    # Si DATABASE_URL tiene templates no resueltos, intentar construir usando variables de Railway
+    if database_url and database_url.startswith("${{"):
+        print("⚠ DATABASE_URL contiene templates no resueltos, intentando construir URL...")
+        railway_private_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN')
+        railway_tcp_proxy_domain = os.getenv('RAILWAY_TCP_PROXY_DOMAIN')
+        railway_tcp_proxy_port = os.getenv('RAILWAY_TCP_PROXY_PORT')
+        pguser = os.getenv('PGUSER') or getattr(settings, 'POSTGRES_USER', 'postgres')
+        pgpassword = os.getenv('PGPASSWORD') or getattr(settings, 'POSTGRES_PASSWORD', '')
+        pgdatabase = 'postgres'  # Para crear bases de datos, necesitamos conectar a 'postgres'
+        
+        print(f"  RAILWAY_PRIVATE_DOMAIN: {railway_private_domain or 'No disponible'}")
+        print(f"  RAILWAY_TCP_PROXY_DOMAIN: {railway_tcp_proxy_domain or 'No disponible'}")
+        print(f"  RAILWAY_TCP_PROXY_PORT: {railway_tcp_proxy_port or 'No disponible'}")
+        
+        # Intentar primero con DATABASE_PUBLIC_URL (puede ser más confiable)
+        database_public_url = os.getenv('DATABASE_PUBLIC_URL')
+        if database_public_url and not database_public_url.startswith("${{"):
+            print(f"  Usando DATABASE_PUBLIC_URL")
+            database_url = database_public_url
+        # Si no hay DATABASE_PUBLIC_URL, construir usando RAILWAY_PRIVATE_DOMAIN
+        elif railway_private_domain:
+            print(f"  Construyendo URL usando RAILWAY_PRIVATE_DOMAIN: {railway_private_domain}")
+            database_url = f"postgresql://{pguser}:{pgpassword}@{railway_private_domain}:5432/{pgdatabase}"
+        # Si hay TCP proxy, usarlo como último recurso
+        elif railway_tcp_proxy_domain and railway_tcp_proxy_port:
+            print(f"  Construyendo URL usando TCP Proxy: {railway_tcp_proxy_domain}:{railway_tcp_proxy_port}")
+            database_url = f"postgresql://{pguser}:{pgpassword}@{railway_tcp_proxy_domain}:{railway_tcp_proxy_port}/{pgdatabase}"
+        else:
+            print("  ⚠ No se encontraron variables de Railway para construir la URL")
+            database_url = None
+    
     if database_url and not database_url.startswith("${{"):
         parsed = urlparse(database_url)
         original_hostname = parsed.hostname

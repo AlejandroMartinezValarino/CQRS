@@ -45,11 +45,32 @@ def get_pool_kwargs(
         kwargs['password'] = pgpassword or settings.POSTGRES_PASSWORD
         kwargs['database'] = database or settings.POSTGRES_DB
     
-    # Prioridad 2: DATABASE_URL (si no se usaron variables PGHOST)
+    # Prioridad 2: DATABASE_URL o construcción usando RAILWAY_PRIVATE_DOMAIN
     # En Railway, es mejor usar DATABASE_URL directamente como DSN
     # en lugar de parsearla, ya que asyncpg puede resolver mejor los hostnames
     if 'host' not in kwargs:
-        database_url = getattr(settings, 'DATABASE_URL', None)
+        database_url = getattr(settings, 'DATABASE_URL', None) or os.getenv('DATABASE_URL')
+        
+        # Si DATABASE_URL tiene templates no resueltos, intentar construir usando RAILWAY_PRIVATE_DOMAIN
+        if database_url and database_url.startswith("${{"):
+            railway_private_domain = os.getenv('RAILWAY_PRIVATE_DOMAIN')
+            railway_tcp_proxy_domain = os.getenv('RAILWAY_TCP_PROXY_DOMAIN')
+            railway_tcp_proxy_port = os.getenv('RAILWAY_TCP_PROXY_PORT')
+            pguser = os.getenv('PGUSER') or settings.POSTGRES_USER
+            pgpassword = os.getenv('PGPASSWORD') or settings.POSTGRES_PASSWORD
+            pgdatabase = database or os.getenv('PGDATABASE') or settings.POSTGRES_DB
+            
+            # Intentar primero con DATABASE_PUBLIC_URL (puede ser más confiable)
+            database_public_url = os.getenv('DATABASE_PUBLIC_URL')
+            if database_public_url and not database_public_url.startswith("${{"):
+                database_url = database_public_url
+            # Si no hay DATABASE_PUBLIC_URL, construir usando RAILWAY_PRIVATE_DOMAIN
+            elif railway_private_domain:
+                database_url = f"postgresql://{pguser}:{pgpassword}@{railway_private_domain}:5432/{pgdatabase}"
+            # Si hay TCP proxy, usarlo como último recurso
+            elif railway_tcp_proxy_domain and railway_tcp_proxy_port:
+                database_url = f"postgresql://{pguser}:{pgpassword}@{railway_tcp_proxy_domain}:{railway_tcp_proxy_port}/{pgdatabase}"
+        
         if database_url and not database_url.startswith("${{"):
             try:
                 # Si se especifica una base de datos diferente, modificar la URL
