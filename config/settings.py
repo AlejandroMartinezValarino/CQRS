@@ -48,13 +48,52 @@ class Settings(BaseSettings):
     GRAPHQL_WORKERS: int = Field(default=4, ge=1, le=32, description="Número de workers")
     
     # Security
-    ALLOWED_ORIGINS: list[str] = Field(
-        default_factory=lambda: (
-            ["*"] if os.getenv("ENVIRONMENT") != "production" 
-            else ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
-        ),
-        description="Orígenes permitidos para CORS"
+    ALLOWED_ORIGINS: Optional[str] = Field(
+        default=None,
+        description="Orígenes permitidos para CORS (JSON array o string separado por comas)"
     )
+    
+    @validator("ALLOWED_ORIGINS", pre=True)
+    def parse_allowed_origins(cls, v):
+        """Parse ALLOWED_ORIGINS desde diferentes formatos."""
+        # Si es None o vacío, retornar valor por defecto
+        if not v or (isinstance(v, str) and not v.strip()):
+            env = os.getenv("ENVIRONMENT", "development")
+            if env != "production":
+                return "*"
+            else:
+                return "https://cqrs.alejandrotech.eu,https://www.cqrs.alejandrotech.eu"
+        
+        # Si ya es una lista, convertir a string
+        if isinstance(v, list):
+            return ",".join(v)
+        
+        return v
+    
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        """Retorna ALLOWED_ORIGINS como lista."""
+        if not self.ALLOWED_ORIGINS:
+            env = os.getenv("ENVIRONMENT", "development")
+            if env != "production":
+                return ["*"]
+            else:
+                return ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
+        
+        # Si es "*", retornar como lista
+        if self.ALLOWED_ORIGINS == "*":
+            return ["*"]
+        
+        # Intentar parsear como JSON
+        if self.ALLOWED_ORIGINS.strip().startswith("["):
+            try:
+                import json
+                return json.loads(self.ALLOWED_ORIGINS)
+            except:
+                pass
+        
+        # Tratar como string separado por comas
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
     
     # Monitoring
     ENABLE_METRICS: bool = Field(default=True, description="Habilitar métricas")
