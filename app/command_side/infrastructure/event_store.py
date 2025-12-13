@@ -93,16 +93,16 @@ class EventStore:
             raise
     
     async def health_check(self) -> bool:
-        """Verifica la salud de la conexión al Event Store."""
+        """Verifica la salud del Event Store sin crear conexiones innecesarias."""
         try:
-            if not self._pool or self._pool.is_closing():
-                return False
-            
-            async with self._pool.acquire() as conn:
-                await conn.fetchval("SELECT 1")
-            return True
+            # Solo verificar si el pool existe y no está cerrado
+            if self._pool and not self._pool.is_closing():
+                # El pool existe y está abierto
+                return True
+            return False
         except Exception as e:
             logger.error(f"Health check del Event Store falló: {e}")
+            return False
             return False
     
     async def get_events_by_aggregate_id(

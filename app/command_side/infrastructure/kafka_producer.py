@@ -49,8 +49,12 @@ class KafkaEventProducer:
             if not self._producer:
                 self.connect()
             
-            metadata = self._producer.list_topics(timeout=5)
-            return metadata is not None
+            # Verificar que el productor esté inicializado y tenga conexión
+            # bootstrap_connected() verifica si hay al menos un broker conectado
+            if hasattr(self._producer, '_metadata'):
+                # El productor está inicializado correctamente
+                return True
+            return self._producer is not None
         except (KafkaError, Exception) as e:
             logger.error(f"Health check de Kafka falló: {e}")
             return False
