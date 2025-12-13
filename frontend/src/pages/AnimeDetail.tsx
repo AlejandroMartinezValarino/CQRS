@@ -156,15 +156,6 @@ export const AnimeDetail = () => {
         </Card>
       )}
 
-      <Card style={{ marginTop: '24px' }}>
-        <Button
-          type="primary"
-          onClick={() => navigate(`/interactions?anime_id=${animeId}`)}
-          style={{ marginRight: '8px' }}
-        >
-          Registrar Interacción
-        </Button>
-      </Card>
     </div>
   );
 };

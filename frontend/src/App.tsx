@@ -2,12 +2,11 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { ApolloProvider } from '@apollo/client';
 import { Layout, Menu } from 'antd';
-import { DashboardOutlined, UnorderedListOutlined, InteractionOutlined } from '@ant-design/icons';
+import { DashboardOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { apolloClient } from '@/services/graphql/client';
 import { Dashboard } from '@/pages/Dashboard';
 import { AnimeList } from '@/pages/AnimeList';
 import { AnimeDetail } from '@/pages/AnimeDetail';
-import { Interactions } from '@/pages/Interactions';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const { Header, Content, Sider } = Layout;
@@ -26,11 +25,6 @@ const AppLayout = () => {
       key: '/dashboard',
       icon: <DashboardOutlined />,
       label: 'Estadísticas',
-    },
-    {
-      key: '/interactions',
-      icon: <InteractionOutlined />,
-      label: 'Interacciones',
     },
   ];
 
@@ -55,7 +49,6 @@ const AppLayout = () => {
             <Route path="/animes" element={<AnimeList />} />
             <Route path="/animes/:id" element={<AnimeDetail />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/interactions" element={<Interactions />} />
             <Route path="/" element={<Navigate to="/animes" replace />} />
           </Routes>
         </Content>
