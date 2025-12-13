@@ -51,30 +51,12 @@ for var, value in sorted(all_vars.items()):
 print("\nInformación del entorno Railway:")
 railway_vars = [
     'RAILWAY_ENVIRONMENT', 'RAILWAY_PROJECT_ID', 'RAILWAY_SERVICE_NAME',
-    'RAILWAY_PRIVATE_DOMAIN', 'RAILWAY_TCP_PROXY_DOMAIN', 'RAILWAY_TCP_PROXY_PORT',
-    'DATABASE_PUBLIC_URL'
+    'RAILWAY_PRIVATE_DOMAIN'
 ]
 for var in railway_vars:
     value = os.getenv(var)
     if value:
-        if 'PASSWORD' in var or (var == 'DATABASE_PUBLIC_URL' and '@' in value):
-            if '@' in value:
-                # Ocultar contraseña en DATABASE_PUBLIC_URL
-                parts = value.split('@')
-                if '://' in parts[0]:
-                    user_pass = parts[0].split('://')[1]
-                    if ':' in user_pass:
-                        user = user_pass.split(':')[0]
-                        masked = value.replace(user_pass, f"{user}:***")
-                        print(f"  {var}: {masked}")
-                    else:
-                        print(f"  {var}: [oculta]")
-                else:
-                    print(f"  {var}: [oculta]")
-            else:
-                print(f"  {var}: [oculta]")
-        else:
-            print(f"  {var}: {value}")
+        print(f"  {var}: {value}")
     else:
         print(f"  {var}: [no configurada]")
 
