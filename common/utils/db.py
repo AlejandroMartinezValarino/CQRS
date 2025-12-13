@@ -1,6 +1,6 @@
 """Utilidades para conexiones a base de datos."""
 from typing import Dict, Any, Optional
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 import asyncpg
 from config.settings import settings
 
@@ -35,17 +35,33 @@ def get_pool_kwargs(
             # Parsear la URL (puede ser postgresql:// o postgres://)
             parsed = urlparse(database_url)
             
+            # Filtrar parámetros no válidos de la query string
+            # asyncpg no acepta connect_timeout, max_queries, max_inactive_connection_lifetime
+            # como parámetros de query string
+            invalid_params = {'connect_timeout', 'max_queries', 'max_inactive_connection_lifetime'}
+            
+            if parsed.query:
+                query_params = parse_qs(parsed.query, keep_blank_values=True)
+                # Filtrar parámetros no válidos
+                filtered_params = {
+                    k: v for k, v in query_params.items() 
+                    if k.lower() not in invalid_params
+                }
+                # Reconstruir query string sin los parámetros inválidos
+                if filtered_params:
+                    new_query = urlencode(filtered_params, doseq=True)
+                else:
+                    new_query = ''
+                parsed = parsed._replace(query=new_query)
+            
             # Si se especifica una base de datos diferente, modificar el path
             if database:
                 # Construir nueva URL con la base de datos especificada
                 new_path = f'/{database}'
-                # Mantener query y fragment si existen
-                new_parsed = parsed._replace(path=new_path)
-                dsn = urlunparse(new_parsed)
-            else:
-                # Usar DATABASE_URL tal cual
-                dsn = database_url
+                parsed = parsed._replace(path=new_path)
             
+            # Reconstruir la URL sin parámetros inválidos
+            dsn = urlunparse(parsed)
             kwargs['dsn'] = dsn
             
         except Exception:
