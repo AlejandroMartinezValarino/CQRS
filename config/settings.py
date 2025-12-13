@@ -1,7 +1,7 @@
 """Configuración de la aplicación con validación para producción."""
 import os
 import json
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_validator, computed_field
 from pydantic_settings import BaseSettings
 from typing import Optional, Union
 
@@ -49,47 +49,70 @@ class Settings(BaseSettings):
     GRAPHQL_WORKERS: int = Field(default=4, ge=1, le=32, description="Número de workers")
     
     # Security
-    ALLOWED_ORIGINS: list[str] = Field(
-        default_factory=lambda: (
-            ["*"] if os.getenv("ENVIRONMENT") != "production" 
-            else ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
-        ),
-        description="Orígenes permitidos para CORS"
-    )
+    # Usamos str para evitar el parseo automático como JSON por Pydantic Settings
+    _allowed_origins_raw: Optional[str] = Field(default=None, alias="ALLOWED_ORIGINS")
     
-    @field_validator("ALLOWED_ORIGINS", mode="before")
+    @field_validator("_allowed_origins_raw", mode="before")
     @classmethod
-    def parse_allowed_origins(cls, v: Union[str, list, None]) -> Union[list, None]:
-        """Parsea ALLOWED_ORIGINS desde JSON o string separado por comas."""
-        # Si no hay valor, retornar None para usar default_factory
+    def intercept_allowed_origins(cls, v: Union[str, list, None]) -> Optional[str]:
+        """Intercepta el valor antes del parseo JSON y lo mantiene como string."""
+        # Si es None, retornar None
         if v is None:
             return None
         
-        # Si ya es una lista, retornarla directamente
+        # Si ya es una lista (fue parseado como JSON), convertir a string JSON
         if isinstance(v, list):
+            return json.dumps(v)
+        
+        # Si es un string, retornarlo tal cual
+        if isinstance(v, str):
             return v
         
-        # Si es un string
-        if isinstance(v, str):
-            # Si está vacío, retornar None para usar default_factory
-            v_stripped = v.strip()
-            if not v_stripped:
-                return None
-            
-            # Intentar parsear como JSON primero
-            try:
-                parsed = json.loads(v_stripped)
-                if isinstance(parsed, list):
-                    return parsed
-                # Si es JSON pero no una lista, retornar None
-                return None
-            except (json.JSONDecodeError, ValueError):
-                # Si no es JSON válido, tratar como string separado por comas
-                origins = [origin.strip() for origin in v_stripped.split(",") if origin.strip()]
-                return origins if origins else None
-        
-        # Para cualquier otro tipo, retornar None para usar default_factory
         return None
+    
+    @field_validator("_allowed_origins_raw", mode="after")
+    @classmethod
+    def normalize_allowed_origins(cls, v: Optional[str]) -> Optional[str]:
+        """Normaliza el valor: si está vacío o es template no resuelto, retornar None."""
+        if v is None:
+            return None
+        v_stripped = v.strip()
+        # Si está vacío o es un template no resuelto, retornar None para usar default
+        if not v_stripped or v_stripped.startswith("${{"):
+            return None
+        return v
+    
+    @computed_field
+    @property
+    def ALLOWED_ORIGINS(self) -> list[str]:
+        """Orígenes permitidos para CORS."""
+        # Si no hay valor, usar valores por defecto
+        if self._allowed_origins_raw is None:
+            env = getattr(self, 'ENVIRONMENT', os.getenv("ENVIRONMENT", "development"))
+            if env != "production":
+                return ["*"]
+            else:
+                return ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
+        
+        v_stripped = self._allowed_origins_raw.strip()
+        
+        # Intentar parsear como JSON
+        try:
+            parsed = json.loads(v_stripped)
+            if isinstance(parsed, list):
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            # Si no es JSON válido, tratar como string separado por comas
+            origins = [origin.strip() for origin in v_stripped.split(",") if origin.strip()]
+            if origins:
+                return origins
+        
+        # Fallback a valores por defecto
+        env = getattr(self, 'ENVIRONMENT', os.getenv("ENVIRONMENT", "development"))
+        if env != "production":
+            return ["*"]
+        else:
+            return ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
     
     # Monitoring
     ENABLE_METRICS: bool = Field(default=True, description="Habilitar métricas")
