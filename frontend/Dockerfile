@@ -23,8 +23,9 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
-EXPOSE 80
+# Railway asigna PORT dinámicamente, exponemos ese puerto
+EXPOSE ${PORT:-8080}
 
-ENV PORT=80
+# No establecer PORT por defecto aquí, dejar que Railway lo asigne
 
 CMD ["sh", "-c", "envsubst '$$PORT' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
