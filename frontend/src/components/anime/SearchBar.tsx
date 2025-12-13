@@ -1,21 +1,31 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { AutoComplete, Input } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { useLazyQuery } from '@apollo/client';
 import { SEARCH_ANIMES } from '@/services/graphql/queries';
 import type { PaginatedAnimes } from '@/types/anime';
-import { debounce } from 'lodash-es';
 
 interface SearchBarProps {
   onSearch: (value: string) => void;
   onSelect?: (value: string, anime: any) => void;
 }
 
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+}
+
 export const SearchBar = ({ onSearch, onSelect }: SearchBarProps) => {
   const [options, setOptions] = useState<any[]>([]);
   const [searchQuery, { loading }] = useLazyQuery<{ searchAnimes: PaginatedAnimes }>(SEARCH_ANIMES);
 
-  const handleSearch = useCallback(
+  const handleSearchDebounced = useCallback(
     debounce(async (value: string) => {
       if (!value || value.length < 2) {
         setOptions([]);
@@ -73,7 +83,7 @@ export const SearchBar = ({ onSearch, onSelect }: SearchBarProps) => {
   return (
     <AutoComplete
       options={options}
-      onSearch={handleSearch}
+      onSearch={handleSearchDebounced}
       onSelect={handleSelect}
       style={{ width: '100%' }}
     >

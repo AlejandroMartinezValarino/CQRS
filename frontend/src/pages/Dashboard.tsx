@@ -1,9 +1,8 @@
-import { Row, Col, Card, Statistic, Table, Spin } from 'antd';
+import { Row, Col, Card, Statistic, Table } from 'antd';
 import { EyeOutlined, LikeOutlined, StarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useTopAnimesByViews, useTopAnimesByRating } from '@/hooks/useGraphQL';
 import { Loading } from '@/components/common/Loading';
 import { formatNumber, formatDuration } from '@/utils';
-import type { AnimeStats } from '@/types/anime';
 
 const columns = [
   {

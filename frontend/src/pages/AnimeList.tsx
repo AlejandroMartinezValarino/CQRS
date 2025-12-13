@@ -21,7 +21,7 @@ export const AnimeList = () => {
   const [allItems, setAllItems] = useState<any[]>([]);
   const observerTarget = useRef<HTMLDivElement>(null);
 
-  const { data, loading, fetchMore } = useSearchAnimes(page, 20, filters);
+  const { data, loading } = useSearchAnimes(page, 20, filters);
 
   useEffect(() => {
     setPage(1);
