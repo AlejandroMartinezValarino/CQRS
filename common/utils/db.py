@@ -29,10 +29,11 @@ def get_pool_kwargs(
     kwargs: Dict[str, Any] = {}
     
     # Si DATABASE_URL está disponible y no es un template no resuelto, usarla
-    if settings.DATABASE_URL and not settings.DATABASE_URL.startswith("${{"):
+    database_url = getattr(settings, 'DATABASE_URL', None)
+    if database_url and not database_url.startswith("${{"):
         try:
             # Parsear la URL (puede ser postgresql:// o postgres://)
-            parsed = urlparse(settings.DATABASE_URL)
+            parsed = urlparse(database_url)
             
             # Si se especifica una base de datos diferente, modificar el path
             if database:
@@ -43,7 +44,7 @@ def get_pool_kwargs(
                 dsn = urlunparse(new_parsed)
             else:
                 # Usar DATABASE_URL tal cual
-                dsn = settings.DATABASE_URL
+                dsn = database_url
             
             kwargs['dsn'] = dsn
             
