@@ -22,37 +22,71 @@ async def create_database_if_not_exists(db_name: str):
     # Primero intentar usar DATABASE_URL directamente como DSN (asyncpg puede resolver mejor)
     database_url = getattr(settings, 'DATABASE_URL', None)
     if database_url and not database_url.startswith("${{"):
-        try:
-            # Modificar DATABASE_URL para apuntar a la base de datos 'postgres'
-            parsed = urlparse(database_url)
-            # Cambiar el path para usar 'postgres'
-            modified_url = urlunparse((
+        parsed = urlparse(database_url)
+        original_hostname = parsed.hostname
+        
+        # Lista de URLs a intentar (con diferentes hostnames)
+        urls_to_try = []
+        
+        # 1. URL original con hostname original
+        modified_url_original = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            '/postgres',
+            parsed.params,
+            parsed.query,
+            parsed.fragment
+        ))
+        urls_to_try.append(('original', modified_url_original))
+        
+        # 2. Si el hostname es .railway.internal, intentar con localhost
+        if original_hostname and original_hostname.endswith('.railway.internal'):
+            # Reemplazar el hostname con localhost pero mantener credenciales
+            netloc_parts = parsed.netloc.split('@')
+            if len(netloc_parts) == 2:
+                # Hay usuario:contraseña@hostname
+                user_pass = netloc_parts[0]
+                new_netloc = f"{user_pass}@localhost:{parsed.port or 5432}"
+            else:
+                # Solo hostname:puerto
+                new_netloc = f"localhost:{parsed.port or 5432}"
+            
+            modified_url_localhost = urlunparse((
                 parsed.scheme,
-                parsed.netloc,
-                '/postgres',  # Conectar a la BD 'postgres'
+                new_netloc,
+                '/postgres',
                 parsed.params,
                 parsed.query,
                 parsed.fragment
             ))
-            print(f"Intentando conectar usando DATABASE_URL directamente...")
-            conn = await asyncpg.connect(modified_url)
-            
+            urls_to_try.append(('localhost', modified_url_localhost))
+        
+        # Intentar cada URL
+        for url_name, url in urls_to_try:
             try:
-                exists = await conn.fetchval(
-                    "SELECT 1 FROM pg_database WHERE datname = $1", db_name
-                )
+                print(f"Intentando conectar usando DATABASE_URL ({url_name})...")
+                conn = await asyncpg.connect(url)
                 
-                if exists:
-                    print(f"✓ Base de datos '{db_name}' ya existe")
-                    return True
-                else:
-                    await conn.execute(f'CREATE DATABASE "{db_name}"')
-                    print(f"✓ Base de datos '{db_name}' creada exitosamente")
-                    return True
-            finally:
-                await conn.close()
-        except Exception as e:
-            print(f"  ✗ Falló con DATABASE_URL: {str(e)[:100]}")
+                try:
+                    exists = await conn.fetchval(
+                        "SELECT 1 FROM pg_database WHERE datname = $1", db_name
+                    )
+                    
+                    if exists:
+                        print(f"✓ Base de datos '{db_name}' ya existe")
+                        return True
+                    else:
+                        await conn.execute(f'CREATE DATABASE "{db_name}"')
+                        print(f"✓ Base de datos '{db_name}' creada exitosamente")
+                        return True
+                finally:
+                    await conn.close()
+            except Exception as e:
+                error_msg = str(e)
+                if len(error_msg) > 100:
+                    error_msg = error_msg[:100] + "..."
+                print(f"  ✗ Falló con DATABASE_URL ({url_name}): {error_msg}")
+                continue
     
     # Si DATABASE_URL falla, intentar con parámetros individuales
     hosts_to_try = []
