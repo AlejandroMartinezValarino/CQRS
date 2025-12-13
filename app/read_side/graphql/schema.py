@@ -185,15 +185,6 @@ class Query:
             type=row.get("type"),
             episodes=row.get("episodes"),
             score=float(row["score"]) if row.get("score") else None,
-    def _row_to_anime(self, row: dict) -> Anime:
-        return Anime(
-            myanimelist_id=row["myanimelist_id"],
-            title=row["title"],
-            description=row.get("description"),
-            image=row.get("image"),
-            type=row.get("type"),
-            episodes=row.get("episodes"),
-            score=float(row["score"]) if row.get("score") else None,
             popularity=row.get("popularity"),
         )
     
