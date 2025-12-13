@@ -21,29 +21,128 @@ async def create_database_if_not_exists(db_name: str):
     # Si get_pool_kwargs retornó una DSN, usarla directamente
     if 'dsn' in pool_kwargs:
         dsn = pool_kwargs['dsn']
-        # Modificar la DSN para apuntar a la base de datos 'postgres'
         parsed = urlparse(dsn)
-        modified_dsn = urlunparse((
-            parsed.scheme,
-            parsed.netloc,
-            '/postgres',  # Conectar a la BD 'postgres' para crear otras BDs
-            parsed.params,
-            parsed.query,
-            parsed.fragment
-        ))
+        original_hostname = parsed.hostname
         
-        # Intentar múltiples veces con retry (la red privada puede tardar)
-        max_retries = 3
-        for attempt in range(max_retries):
+        # Lista de hostnames a intentar (según Railway docs, también se puede usar "postgres")
+        hostnames_to_try = []
+        if original_hostname and original_hostname.endswith('.railway.internal'):
+            # Intentar primero con el hostname simplificado (ej: postgres.railway.internal -> postgres)
+            service_name = original_hostname.replace('.railway.internal', '')
+            hostnames_to_try.append(service_name)  # "postgres" primero
+        hostnames_to_try.append(original_hostname)  # "postgres.railway.internal" después
+        
+        # Intentar con cada hostname
+        for hostname in hostnames_to_try:
+            # Modificar la DSN para apuntar a la base de datos 'postgres' y cambiar hostname
+            netloc_parts = parsed.netloc.split('@')
+            if len(netloc_parts) == 2:
+                # Hay usuario:contraseña@hostname:puerto
+                user_pass = netloc_parts[0]
+                port_part = netloc_parts[1].split(':')
+                if len(port_part) == 2:
+                    new_netloc = f"{user_pass}@{hostname}:{port_part[1]}"
+                else:
+                    new_netloc = f"{user_pass}@{hostname}:{parsed.port or 5432}"
+            else:
+                # Solo hostname:puerto
+                port_part = parsed.netloc.split(':')
+                if len(port_part) == 2:
+                    new_netloc = f"{hostname}:{port_part[1]}"
+                else:
+                    new_netloc = f"{hostname}:{parsed.port or 5432}"
+            
+            modified_dsn = urlunparse((
+                parsed.scheme,
+                new_netloc,
+                '/postgres',  # Conectar a la BD 'postgres' para crear otras BDs
+                parsed.params,
+                parsed.query,
+                parsed.fragment
+            ))
+            
+            # Intentar múltiples veces con retry (la red privada puede tardar)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    if attempt > 0:
+                        wait_time = 2 ** attempt  # Exponential backoff: 2, 4 segundos
+                        print(f"Reintentando en {wait_time} segundos... (intento {attempt + 1}/{max_retries})")
+                        await asyncio.sleep(wait_time)
+                    
+                    print(f"Intentando conectar usando DSN con hostname '{hostname}'...")
+                    # Usar solo la DSN, sin otros parámetros del pool
+                    conn = await asyncpg.connect(modified_dsn)
+                    
+                    try:
+                        exists = await conn.fetchval(
+                            "SELECT 1 FROM pg_database WHERE datname = $1", db_name
+                        )
+                        
+                        if exists:
+                            print(f"✓ Base de datos '{db_name}' ya existe")
+                            return True
+                        else:
+                            await conn.execute(f'CREATE DATABASE "{db_name}"')
+                            print(f"✓ Base de datos '{db_name}' creada exitosamente")
+                            return True
+                    finally:
+                        await conn.close()
+                except Exception as e:
+                    error_msg = str(e)
+                    if len(error_msg) > 100:
+                        error_msg = error_msg[:100] + "..."
+                    print(f"  ✗ Falló con hostname '{hostname}' (intento {attempt + 1}/{max_retries}): {error_msg}")
+                    if attempt == max_retries - 1:
+                        # Último intento de este hostname falló, probar siguiente hostname
+                        break
+                    # Continuar con el siguiente intento
+    
+    # Fallback: intentar con DATABASE_URL directamente y con hostname simplificado
+    database_url = getattr(settings, 'DATABASE_URL', None)
+    if database_url and not database_url.startswith("${{"):
+        parsed = urlparse(database_url)
+        original_hostname = parsed.hostname
+        
+        # Lista de hostnames a intentar (según Railway docs, también se puede usar "postgres")
+        hostnames_to_try = []
+        if original_hostname and original_hostname.endswith('.railway.internal'):
+            # Intentar con el hostname simplificado (ej: postgres.railway.internal -> postgres)
+            service_name = original_hostname.replace('.railway.internal', '')
+            hostnames_to_try.append(service_name)  # "postgres"
+        hostnames_to_try.append(original_hostname)  # "postgres.railway.internal"
+        
+        for hostname in hostnames_to_try:
             try:
-                if attempt > 0:
-                    wait_time = 2 ** attempt  # Exponential backoff: 2, 4 segundos
-                    print(f"Reintentando en {wait_time} segundos... (intento {attempt + 1}/{max_retries})")
-                    await asyncio.sleep(wait_time)
+                # Reemplazar el hostname en la URL
+                netloc_parts = parsed.netloc.split('@')
+                if len(netloc_parts) == 2:
+                    # Hay usuario:contraseña@hostname:puerto
+                    user_pass = netloc_parts[0]
+                    port_part = netloc_parts[1].split(':')
+                    if len(port_part) == 2:
+                        new_netloc = f"{user_pass}@{hostname}:{port_part[1]}"
+                    else:
+                        new_netloc = f"{user_pass}@{hostname}:{parsed.port or 5432}"
+                else:
+                    # Solo hostname:puerto
+                    port_part = parsed.netloc.split(':')
+                    if len(port_part) == 2:
+                        new_netloc = f"{hostname}:{port_part[1]}"
+                    else:
+                        new_netloc = f"{hostname}:{parsed.port or 5432}"
                 
-                print(f"Intentando conectar usando DSN de get_pool_kwargs...")
-                # Usar solo la DSN, sin otros parámetros del pool
-                conn = await asyncpg.connect(modified_dsn)
+                modified_url = urlunparse((
+                    parsed.scheme,
+                    new_netloc,
+                    '/postgres',
+                    parsed.params,
+                    parsed.query,
+                    parsed.fragment
+                ))
+                
+                print(f"Intentando conectar usando DATABASE_URL con hostname '{hostname}'...")
+                conn = await asyncpg.connect(modified_url)
                 
                 try:
                     exists = await conn.fetchval(
@@ -63,48 +162,8 @@ async def create_database_if_not_exists(db_name: str):
                 error_msg = str(e)
                 if len(error_msg) > 100:
                     error_msg = error_msg[:100] + "..."
-                print(f"  ✗ Falló con DSN (intento {attempt + 1}/{max_retries}): {error_msg}")
-                if attempt == max_retries - 1:
-                    # Último intento falló, continuar con fallback
-                    pass
-                # Continuar con el siguiente intento o fallback
-    
-    # Fallback: intentar con DATABASE_URL directamente
-    database_url = getattr(settings, 'DATABASE_URL', None)
-    if database_url and not database_url.startswith("${{"):
-        parsed = urlparse(database_url)
-        modified_url = urlunparse((
-            parsed.scheme,
-            parsed.netloc,
-            '/postgres',
-            parsed.params,
-            parsed.query,
-            parsed.fragment
-        ))
-        
-        try:
-            print(f"Intentando conectar usando DATABASE_URL directamente...")
-            conn = await asyncpg.connect(modified_url)
-            
-            try:
-                exists = await conn.fetchval(
-                    "SELECT 1 FROM pg_database WHERE datname = $1", db_name
-                )
-                
-                if exists:
-                    print(f"✓ Base de datos '{db_name}' ya existe")
-                    return True
-                else:
-                    await conn.execute(f'CREATE DATABASE "{db_name}"')
-                    print(f"✓ Base de datos '{db_name}' creada exitosamente")
-                    return True
-            finally:
-                await conn.close()
-        except Exception as e:
-            error_msg = str(e)
-            if len(error_msg) > 100:
-                error_msg = error_msg[:100] + "..."
-            print(f"  ✗ Falló con DATABASE_URL: {error_msg}")
+                print(f"  ✗ Falló con hostname '{hostname}': {error_msg}")
+                continue
     
     # Último fallback: usar parámetros individuales si están disponibles
     if 'host' in pool_kwargs and pool_kwargs['host']:
