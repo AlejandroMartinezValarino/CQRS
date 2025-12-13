@@ -335,7 +335,7 @@ class ReadModelRepository:
             self._validate_limit(limit)
             
             async with self._pool.acquire() as conn:
-                rows = await conn.fetch("""
+                rows = await conn.fetch(f"""
                     SELECT 
                         a.myanimelist_id,
                         a.title,
@@ -356,19 +356,16 @@ class ReadModelRepository:
                     LEFT JOIN (
                         SELECT 
                             anime_id,
-                            COUNT(DISTINCT CASE WHEN EXISTS (
-                                SELECT 1 FROM anime_clicks WHERE anime_id = anime_stats.anime_id 
-                                AND timestamp >= NOW() - INTERVAL '%s days'
-                            ) THEN 1 END) as clicks,
-                            COUNT(DISTINCT CASE WHEN EXISTS (
-                                SELECT 1 FROM anime_views WHERE anime_id = anime_stats.anime_id 
-                                AND timestamp >= NOW() - INTERVAL '%s days'
-                            ) THEN 1 END) as views,
-                            COUNT(DISTINCT CASE WHEN EXISTS (
-                                SELECT 1 FROM anime_ratings WHERE anime_id = anime_stats.anime_id 
-                                AND timestamp >= NOW() - INTERVAL '%s days'
-                            ) THEN 1 END) as ratings
-                        FROM anime_stats
+                            COUNT(*) FILTER (WHERE last_click_at >= NOW() - INTERVAL '{days} days') as clicks,
+                            COUNT(*) FILTER (WHERE last_view_at >= NOW() - INTERVAL '{days} days') as views,
+                            COUNT(*) FILTER (WHERE rated_at >= NOW() - INTERVAL '{days} days') as ratings
+                        FROM (
+                            SELECT anime_id, last_click_at, NULL::timestamp as last_view_at, NULL::timestamp as rated_at FROM anime_clicks
+                            UNION ALL
+                            SELECT anime_id, NULL::timestamp, last_view_at, NULL::timestamp FROM anime_views
+                            UNION ALL
+                            SELECT anime_id, NULL::timestamp, NULL::timestamp, rated_at FROM anime_ratings
+                        ) agg
                         GROUP BY anime_id
                     ) recent ON a.myanimelist_id = recent.anime_id
                     WHERE recent.clicks IS NOT NULL OR recent.views IS NOT NULL OR recent.ratings IS NOT NULL
