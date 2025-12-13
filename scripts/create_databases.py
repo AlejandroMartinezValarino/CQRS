@@ -13,6 +13,7 @@ import asyncpg
 
 async def create_database_if_not_exists(db_name: str):
     """Crea una base de datos si no existe."""
+    import asyncio
     from urllib.parse import urlparse, urlunparse
     
     pool_kwargs = get_pool_kwargs(database='postgres')
@@ -31,31 +32,42 @@ async def create_database_if_not_exists(db_name: str):
             parsed.fragment
         ))
         
-        try:
-            print(f"Intentando conectar usando DSN de get_pool_kwargs...")
-            # Usar solo la DSN, sin otros parámetros del pool
-            conn = await asyncpg.connect(modified_dsn)
-            
+        # Intentar múltiples veces con retry (la red privada puede tardar)
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
-                exists = await conn.fetchval(
-                    "SELECT 1 FROM pg_database WHERE datname = $1", db_name
-                )
+                if attempt > 0:
+                    wait_time = 2 ** attempt  # Exponential backoff: 2, 4 segundos
+                    print(f"Reintentando en {wait_time} segundos... (intento {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(wait_time)
                 
-                if exists:
-                    print(f"✓ Base de datos '{db_name}' ya existe")
-                    return True
-                else:
-                    await conn.execute(f'CREATE DATABASE "{db_name}"')
-                    print(f"✓ Base de datos '{db_name}' creada exitosamente")
-                    return True
-            finally:
-                await conn.close()
-        except Exception as e:
-            error_msg = str(e)
-            if len(error_msg) > 100:
-                error_msg = error_msg[:100] + "..."
-            print(f"  ✗ Falló con DSN: {error_msg}")
-            # Continuar con el fallback
+                print(f"Intentando conectar usando DSN de get_pool_kwargs...")
+                # Usar solo la DSN, sin otros parámetros del pool
+                conn = await asyncpg.connect(modified_dsn)
+                
+                try:
+                    exists = await conn.fetchval(
+                        "SELECT 1 FROM pg_database WHERE datname = $1", db_name
+                    )
+                    
+                    if exists:
+                        print(f"✓ Base de datos '{db_name}' ya existe")
+                        return True
+                    else:
+                        await conn.execute(f'CREATE DATABASE "{db_name}"')
+                        print(f"✓ Base de datos '{db_name}' creada exitosamente")
+                        return True
+                finally:
+                    await conn.close()
+            except Exception as e:
+                error_msg = str(e)
+                if len(error_msg) > 100:
+                    error_msg = error_msg[:100] + "..."
+                print(f"  ✗ Falló con DSN (intento {attempt + 1}/{max_retries}): {error_msg}")
+                if attempt == max_retries - 1:
+                    # Último intento falló, continuar con fallback
+                    pass
+                # Continuar con el siguiente intento o fallback
     
     # Fallback: intentar con DATABASE_URL directamente
     database_url = getattr(settings, 'DATABASE_URL', None)
