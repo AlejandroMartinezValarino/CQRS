@@ -50,9 +50,9 @@ class Settings(BaseSettings):
     
     # Security
     # Usamos str para evitar el parseo automático como JSON por Pydantic Settings
-    _allowed_origins_raw: Optional[str] = Field(default=None, alias="ALLOWED_ORIGINS")
+    allowed_origins_raw: Optional[str] = Field(default=None, alias="ALLOWED_ORIGINS", exclude=True)
     
-    @field_validator("_allowed_origins_raw", mode="before")
+    @field_validator("allowed_origins_raw", mode="before")
     @classmethod
     def intercept_allowed_origins(cls, v: Union[str, list, None]) -> Optional[str]:
         """Intercepta el valor antes del parseo JSON y lo mantiene como string."""
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
         
         return None
     
-    @field_validator("_allowed_origins_raw", mode="after")
+    @field_validator("allowed_origins_raw", mode="after")
     @classmethod
     def normalize_allowed_origins(cls, v: Optional[str]) -> Optional[str]:
         """Normaliza el valor: si está vacío o es template no resuelto, retornar None."""
@@ -87,14 +87,14 @@ class Settings(BaseSettings):
     def ALLOWED_ORIGINS(self) -> list[str]:
         """Orígenes permitidos para CORS."""
         # Si no hay valor, usar valores por defecto
-        if self._allowed_origins_raw is None:
+        if self.allowed_origins_raw is None:
             env = getattr(self, 'ENVIRONMENT', os.getenv("ENVIRONMENT", "development"))
             if env != "production":
                 return ["*"]
             else:
                 return ["https://cqrs.alejandrotech.eu", "https://www.cqrs.alejandrotech.eu"]
         
-        v_stripped = self._allowed_origins_raw.strip()
+        v_stripped = self.allowed_origins_raw.strip()
         
         # Intentar parsear como JSON
         try:
