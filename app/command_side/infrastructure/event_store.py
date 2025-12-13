@@ -7,6 +7,7 @@ from asyncpg import Pool
 from common.events.base_event import BaseEvent
 from common.utils.logger import get_logger
 from common.utils.retry import retry_async
+from common.utils.db import get_pool_kwargs
 from config.settings import settings
 
 logger = get_logger(__name__)
@@ -31,16 +32,14 @@ class EventStore:
                 f"{settings.POSTGRES_EVENT_STORE_DB}"
             )
             
-            self._pool = await asyncpg.create_pool(
-                host=settings.POSTGRES_HOST,
-                port=settings.POSTGRES_PORT,
-                user=settings.POSTGRES_USER,
-                password=settings.POSTGRES_PASSWORD,
+            pool_kwargs = get_pool_kwargs(
                 database=settings.POSTGRES_EVENT_STORE_DB,
                 min_size=settings.POSTGRES_EVENT_STORE_MIN_CONNECTIONS,
                 max_size=settings.POSTGRES_EVENT_STORE_MAX_CONNECTIONS,
                 command_timeout=settings.POSTGRES_COMMAND_TIMEOUT,
             )
+            
+            self._pool = await asyncpg.create_pool(**pool_kwargs)
             self._connected = True
             logger.info("Conexión al Event Store establecida correctamente")
         except Exception as e:

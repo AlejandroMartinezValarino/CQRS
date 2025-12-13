@@ -1,6 +1,7 @@
 from typing import Optional
 import asyncpg
 from common.utils.logger import get_logger
+from common.utils.db import get_pool_kwargs
 from config.settings import settings
 
 logger = get_logger(__name__)
@@ -14,13 +15,8 @@ class AnimeValidator:
     async def _get_pool(self):
         """Obtiene el pool de conexiones."""
         if not self._pool:
-            self._pool = await asyncpg.create_pool(
-                host=settings.POSTGRES_HOST,
-                port=settings.POSTGRES_PORT,
-                user=settings.POSTGRES_USER,
-                password=settings.POSTGRES_PASSWORD,
-                database=settings.POSTGRES_DB,
-            )
+            pool_kwargs = get_pool_kwargs(database=settings.POSTGRES_DB)
+            self._pool = await asyncpg.create_pool(**pool_kwargs)
         return self._pool
     
     async def anime_exists(self, anime_id: int) -> bool:
