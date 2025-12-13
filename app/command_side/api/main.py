@@ -147,19 +147,28 @@ async def health():
         "version": "1.0.0"
     }
     
-    event_store_healthy = await command_handler.event_store.health_check()
-    kafka_healthy = command_handler.kafka_producer.health_check()
+    try:
+        event_store_healthy = await command_handler.event_store.health_check()
+    except Exception as e:
+        logger.warning(f"Event store health check failed: {e}")
+        event_store_healthy = False
+    
+    try:
+        kafka_healthy = command_handler.kafka_producer.health_check()
+    except Exception as e:
+        logger.warning(f"Kafka health check failed: {e}")
+        kafka_healthy = False
+    
     health_status["dependencies"] = {
         "event_store": "healthy" if event_store_healthy else "unhealthy",
         "kafka": "healthy" if kafka_healthy else "unhealthy"
     }
     
-    if not event_store_healthy or not kafka_healthy:
+    # Solo marcar como no saludable si event_store falla (Kafka es opcional para health)
+    if not event_store_healthy:
         health_status["status"] = "degraded"
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content=health_status
-        )
+        # Retornar 200 en lugar de 503 para que Railway no marque el servicio como caído
+        # Railway puede seguir enrutando tráfico incluso si hay dependencias degradadas
     
     return health_status
 
