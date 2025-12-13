@@ -42,7 +42,7 @@ def get_pool_kwargs(
             
             if parsed.query:
                 query_params = parse_qs(parsed.query, keep_blank_values=True)
-                # Filtrar parámetros no válidos
+                # Filtrar parámetros no válidos (comparación case-insensitive)
                 filtered_params = {
                     k: v for k, v in query_params.items() 
                     if k.lower() not in invalid_params
@@ -62,7 +62,13 @@ def get_pool_kwargs(
             
             # Reconstruir la URL sin parámetros inválidos
             dsn = urlunparse(parsed)
-            kwargs['dsn'] = dsn
+            
+            # Verificación adicional: asegurarse de que la DSN no contenga parámetros inválidos
+            if 'connect_timeout' not in dsn.lower() and 'max_queries' not in dsn.lower():
+                kwargs['dsn'] = dsn
+            else:
+                # Si aún contiene parámetros inválidos, usar variables individuales
+                raise ValueError("DSN contiene parámetros inválidos después del filtrado")
             
         except Exception:
             # Si hay error parseando DATABASE_URL, usar variables individuales
@@ -85,5 +91,11 @@ def get_pool_kwargs(
         kwargs['command_timeout'] = command_timeout
     elif hasattr(settings, 'POSTGRES_COMMAND_TIMEOUT'):
         kwargs['command_timeout'] = settings.POSTGRES_COMMAND_TIMEOUT
+    
+    # Asegurarse de que no se pasen parámetros inválidos a asyncpg
+    # Estos parámetros no son soportados por asyncpg.create_pool
+    invalid_kwargs = {'connect_timeout', 'max_queries', 'max_inactive_connection_lifetime', 'server_settings'}
+    for invalid_key in invalid_kwargs:
+        kwargs.pop(invalid_key, None)
     
     return kwargs

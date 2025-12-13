@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", description="Nivel de logging: DEBUG, INFO, WARNING, ERROR")
     
     # Database - Read Model
+    DATABASE_URL: Optional[str] = Field(default=None, description="URL completa de conexión a PostgreSQL (opcional)")
     POSTGRES_HOST: str = Field(default="localhost", description="Host de PostgreSQL")
     POSTGRES_PORT: int = Field(default=5432, ge=1, le=65535, description="Puerto de PostgreSQL")
     POSTGRES_USER: str = Field(default="Molkiu", description="Usuario de PostgreSQL")
