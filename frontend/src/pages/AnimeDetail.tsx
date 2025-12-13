@@ -2,9 +2,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Statistic, Button, Empty, Typography } from 'antd';
 import { ArrowLeftOutlined, EyeOutlined, LikeOutlined, StarOutlined } from '@ant-design/icons';
 import { useAnime, useAnimeStats, useRecommendedAnimes } from '@/hooks/useGraphQL';
+import { useAutoInteractions } from '@/hooks/useAutoInteractions';
 import { Loading } from '@/components/common/Loading';
 import { AnimeCard } from '@/components/anime/AnimeCard';
 import { formatNumber, formatDuration } from '@/utils';
+import { sendClick } from '@/utils/interactions';
 
 const { Title } = Typography;
 
@@ -12,6 +14,7 @@ export const AnimeDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const animeId = id ? parseInt(id, 10) : 0;
+  useAutoInteractions(animeId);
 
   const { data: animeData, loading: animeLoading } = useAnime(animeId);
   const { data: statsData, loading: statsLoading } = useAnimeStats(animeId);
@@ -142,7 +145,10 @@ export const AnimeDetail = () => {
               <Col key={recAnime.myanimelistId} xs={12} sm={8} md={6} lg={4}>
                 <AnimeCard
                   anime={recAnime}
-                  onClick={() => navigate(`/animes/${recAnime.myanimelistId}`)}
+                onClick={() => {
+                  sendClick(recAnime.myanimelistId);
+                  navigate(`/animes/${recAnime.myanimelistId}`);
+                }}
                 />
               </Col>
             ))}

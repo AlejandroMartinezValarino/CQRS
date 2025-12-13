@@ -8,6 +8,7 @@ import { SearchBar } from '@/components/anime/SearchBar';
 import { FilterPanel } from '@/components/anime/FilterPanel';
 import { TrendingSection } from '@/components/anime/TrendingSection';
 import type { AnimeFilters } from '@/types/anime';
+import { sendClick } from '@/utils/interactions';
 
 const { Title } = Typography;
 
@@ -65,6 +66,7 @@ export const AnimeList = () => {
   };
 
   const handleAnimeSelect = (_value: string, anime: any) => {
+    sendClick(anime.myanimelistId);
     navigate(`/animes/${anime.myanimelistId}`);
   };
 
@@ -123,7 +125,10 @@ export const AnimeList = () => {
                   >
                     <AnimeCard
                       anime={anime}
-                      onClick={() => navigate(`/animes/${anime.myanimelistId}`)}
+                      onClick={() => {
+                        sendClick(anime.myanimelistId);
+                        navigate(`/animes/${anime.myanimelistId}`);
+                      }}
                     />
                   </Col>
                 ))}
