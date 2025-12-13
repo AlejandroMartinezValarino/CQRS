@@ -8,19 +8,15 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from config.settings import settings
+from common.utils.db import get_pool_kwargs
 import asyncpg
 
 
 async def run_migration(db_name: str, migration_file: Path):
     """Ejecuta una migración SQL usando asyncpg."""
     try:
-        conn = await asyncpg.connect(
-            host=settings.POSTGRES_HOST,
-            port=settings.POSTGRES_PORT,
-            user=settings.POSTGRES_USER,
-            password=settings.POSTGRES_PASSWORD,
-            database=db_name
-        )
+        pool_kwargs = get_pool_kwargs(database=db_name)
+        conn = await asyncpg.connect(**pool_kwargs)
         
         try:
             sql_content = migration_file.read_text()
@@ -58,6 +54,9 @@ async def main():
     migrations = [
         (settings.POSTGRES_EVENT_STORE_DB, migrations_dir / "001_create_event_store.sql"),
         (settings.POSTGRES_DB, migrations_dir / "002_create_read_model.sql"),
+        (settings.POSTGRES_DB, migrations_dir / "003_add_event_processing_tracking.sql"),
+        (settings.POSTGRES_DB, migrations_dir / "004_create_dead_letter_queue.sql"),
+        (settings.POSTGRES_DB, migrations_dir / "005_add_indexes.sql"),
     ]
     
     print("Ejecutando migraciones...")
