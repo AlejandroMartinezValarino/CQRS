@@ -58,6 +58,9 @@ async def main():
     migrations = [
         (settings.POSTGRES_EVENT_STORE_DB, migrations_dir / "001_create_event_store.sql"),
         (settings.POSTGRES_DB, migrations_dir / "002_create_read_model.sql"),
+        (settings.POSTGRES_DB, migrations_dir / "003_add_event_processing_tracking.sql"),
+        (settings.POSTGRES_DB, migrations_dir / "004_create_dead_letter_queue.sql"),
+        (settings.POSTGRES_DB, migrations_dir / "005_add_indexes.sql"),
     ]
     
     print("Ejecutando migraciones...")

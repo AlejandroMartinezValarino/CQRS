@@ -7,5 +7,8 @@ until python scripts/check_db.py; do
   sleep 2
 done
 
+echo "Migraciones del read model (processed_events, DLQ, índices)..."
+python scripts/run_migrations.py || echo "Advertencia: revisar migraciones"
+
 echo "Iniciando Kafka Consumer..."
 exec python scripts/run_kafka_consumer.py
