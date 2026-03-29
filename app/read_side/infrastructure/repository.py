@@ -92,14 +92,7 @@ class ReadModelRepository:
                 raise RuntimeError("Repository no está conectado. Llama a connect() primero.")
             
             self._validate_limit(limit)
-            
-            cache_key = self._get_cache_key("top_views", limit)
-            if self._cache:
-                cached = self._cache.get(cache_key)
-                if cached is not None:
-                    logger.debug(f"Cache HIT para top_views (limit={limit})")
-                    return cached
-            
+
             logger.debug(f"Obteniendo top {limit} animes por visualizaciones")
             async with self._pool.acquire() as conn:
                 rows = await conn.fetch("""
@@ -119,13 +112,7 @@ class ReadModelRepository:
                     LIMIT $1
                 """, limit)
                 logger.debug(f"Se obtuvieron {len(rows)} resultados")
-                results = [dict(row) for row in rows]
-                
-                # No cachear listas vacías: tras poblar anime_stats el caché seguiría devolviendo [] hasta el TTL.
-                if self._cache and results:
-                    self._cache.set(cache_key, results)
-                
-                return results
+                return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error obteniendo top {limit} animes por visualizaciones: {e}", exc_info=True)
             raise
@@ -138,14 +125,7 @@ class ReadModelRepository:
                 raise RuntimeError("Repository no está conectado. Llama a connect() primero.")
             
             self._validate_limit(limit)
-            
-            cache_key = self._get_cache_key("top_rating", limit)
-            if self._cache:
-                cached = self._cache.get(cache_key)
-                if cached is not None:
-                    logger.debug(f"Cache HIT para top_rating (limit={limit})")
-                    return cached
-            
+
             logger.debug(f"Obteniendo top {limit} animes por calificación promedio")
             async with self._pool.acquire() as conn:
                 rows = await conn.fetch("""
@@ -166,12 +146,7 @@ class ReadModelRepository:
                     LIMIT $1
                 """, limit)
                 logger.debug(f"Se obtuvieron {len(rows)} resultados")
-                results = [dict(row) for row in rows]
-                
-                if self._cache and results:
-                    self._cache.set(cache_key, results)
-                
-                return results
+                return [dict(row) for row in rows]
         except Exception as e:
             logger.error(f"Error obteniendo top {limit} animes por calificación promedio: {e}", exc_info=True)
             raise
