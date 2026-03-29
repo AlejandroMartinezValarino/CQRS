@@ -30,10 +30,18 @@ class KafkaEventProducer:
             self.connect()
         
         for event in events:
+            # mode='json' serializa datetime y tipos compatibles con JSON (Pydantic v2)
+            payload = event.model_dump(mode="json")
             self._producer.send(
                 settings.KAFKA_TOPIC_EVENTS,
                 key=event.aggregate_id,
-                value=event.model_dump(),
+                value=payload,
+            )
+            logger.info(
+                "Evento publicado en Kafka: topic=%s type=%s id=%s",
+                settings.KAFKA_TOPIC_EVENTS,
+                payload.get("event_type"),
+                payload.get("event_id"),
             )
         
         self._producer.flush()

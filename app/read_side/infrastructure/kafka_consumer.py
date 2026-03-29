@@ -34,10 +34,11 @@ class KafkaEventConsumer:
                 settings.KAFKA_TOPIC_EVENTS,
                 bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
                 value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-                group_id="read-side-consumer-group",
+                group_id=settings.KAFKA_CONSUMER_GROUP_ID,
                 enable_auto_commit=True,
                 auto_commit_interval_ms=1000,
                 max_poll_records=10,
+                auto_offset_reset=settings.KAFKA_CONSUMER_AUTO_OFFSET_RESET,
             )
             
             await self.consumer.start()
@@ -105,7 +106,13 @@ class KafkaEventConsumer:
         event_type = event.get("event_type")
         event_id = event.get("event_id", "unknown")
         
-        logger.debug(f"Procesando evento: type={event_type}, id={event_id}")
+        logger.info(
+            "Evento Kafka recibido: type=%s id=%s partition=%s offset=%s",
+            event_type,
+            event_id,
+            getattr(message, "partition", None),
+            getattr(message, "offset", None),
+        )
         
         try:
             if event_type == "ClickRegistered":
