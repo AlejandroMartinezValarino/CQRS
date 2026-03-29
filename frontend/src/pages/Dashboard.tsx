@@ -3,8 +3,6 @@ import { EyeOutlined, LikeOutlined, StarOutlined, ClockCircleOutlined } from '@a
 import { useTopAnimesByViews, useTopAnimesByRating } from '@/hooks/useGraphQL';
 import { Loading } from '@/components/common/Loading';
 import { formatNumber, formatDuration } from '@/utils';
-import type { AnimeStats } from '@/types/anime';
-
 const columns = [
   {
     title: 'Anime ID',
