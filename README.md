@@ -98,6 +98,19 @@ Los eventos se procesan asíncronamente para generar estadísticas agregadas con
 - PostgreSQL 12+
 - Kafka 2.8+
 
+### Despliegue con Docker Compose (stack completo)
+
+Requisitos: Docker y plugin de Docker Compose.
+
+```bash
+cp .env.example .env   # opcional: POSTGRES_PASSWORD, CQRS_PUBLIC_PORT, etc.
+docker compose up -d --build
+```
+
+Por defecto la UI y las APIs accesibles desde el host están en **http://localhost:8081** (variable `CQRS_PUBLIC_PORT`). El servicio `frontend` (Nginx) sirve la SPA y enruta **`/api/`** al command side y **`/graphql`** al read side; PostgreSQL, Kafka y Zookeeper solo usan la red interna de Compose (no publican puertos al host).
+
+Si en el VPS ya tienes Nginx en **80/443**, configura un `server` con `proxy_pass http://127.0.0.1:${CQRS_PUBLIC_PORT}` hacia ese puerto y no dupliques listeners en 80/443 dentro del compose.
+
 ### Instalación Rápida
 
 ```bash

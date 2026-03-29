@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15-alpine
@@ -7,8 +5,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-cqrs_db}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker-compose.init-db.sh:/docker-entrypoint-initdb.d/01-init-db.sh:ro
@@ -18,37 +14,35 @@ services:
       timeout: 5s
       retries: 5
 
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    ports:
-      - "9092:9092"
-    depends_on:
-      - zookeeper
-    healthcheck:
-      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-    ports:
-      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
 
   command-side:
     build:
       context: .
       dockerfile: Dockerfile.command
-    ports:
-      - "8000:8000"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -57,21 +51,25 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cqrs_db}
       POSTGRES_EVENT_STORE_DB: ${POSTGRES_EVENT_STORE_DB:-cqrs_event_store}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      ENVIRONMENT: development
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       PORT: 8000
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/live')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
 
   read-side:
     build:
       context: .
       dockerfile: Dockerfile.read
-    ports:
-      - "8001:8001"
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -80,13 +78,19 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cqrs_db}
       POSTGRES_EVENT_STORE_DB: ${POSTGRES_EVENT_STORE_DB:-cqrs_event_store}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      ENVIRONMENT: development
+      ENVIRONMENT: ${ENVIRONMENT:-production}
       PORT: 8001
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/live')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
     restart: unless-stopped
 
   consumer:
@@ -101,14 +105,32 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-cqrs_db}
       POSTGRES_EVENT_STORE_DB: ${POSTGRES_EVENT_STORE_DB:-cqrs_event_store}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      ENVIRONMENT: development
+      ENVIRONMENT: ${ENVIRONMENT:-production}
     depends_on:
       postgres:
         condition: service_healthy
       kafka:
         condition: service_healthy
       command-side:
-        condition: service_started
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_GRAPHQL_URL: ${VITE_GRAPHQL_URL:-/graphql}
+    ports:
+      - "${CQRS_PUBLIC_PORT:-8081}:80"
+    environment:
+      PORT: 80
+    depends_on:
+      command-side:
+        condition: service_healthy
+      read-side:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
