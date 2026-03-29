@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Statistic, Button, Empty } from 'antd';
 import { ArrowLeftOutlined, EyeOutlined, LikeOutlined, StarOutlined } from '@ant-design/icons';
 import { useAnime, useAnimeStats } from '@/hooks/useGraphQL';
+import { useAnimeVisitTracking } from '@/hooks/useAnimeVisitTracking';
 import { Loading } from '@/components/common/Loading';
 import { formatNumber, formatDuration } from '@/utils';
 
@@ -13,12 +14,16 @@ export const AnimeDetail = () => {
   const { data: animeData, loading: animeLoading } = useAnime(animeId);
   const { data: statsData, loading: statsLoading } = useAnimeStats(animeId);
 
+  const anime = animeData?.anime;
+  const stats = statsData?.animeStats;
+  const hasLoadedContent =
+    !animeLoading && !statsLoading && (!!anime || !!stats);
+
+  useAnimeVisitTracking(animeId, hasLoadedContent);
+
   if (animeLoading || statsLoading) {
     return <Loading />;
   }
-
-  const anime = animeData?.anime;
-  const stats = statsData?.animeStats;
 
   if (!anime && !stats) {
     return (
@@ -125,13 +130,17 @@ export const AnimeDetail = () => {
         </Card>
       )}
 
-      <Card style={{ marginTop: '24px' }}>
+      <Card style={{ marginTop: '24px' }} title="Interacciones manuales">
+        <p style={{ marginBottom: 12, color: '#666' }}>
+          El click y el tiempo en esta ficha se registran solos. Aquí puedes enviar otra vista,
+          un click extra o una calificación.
+        </p>
         <Button
           type="primary"
           onClick={() => navigate(`/interactions?anime_id=${animeId}`)}
           style={{ marginRight: '8px' }}
         >
-          Registrar Interacción
+          Abrir formulario
         </Button>
       </Card>
     </div>
