@@ -22,6 +22,9 @@ class KafkaEventProducer:
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
             key_serializer=lambda k: k.encode("utf-8") if k else None,
+            # Sin esto, send/flush puede bloquear mucho si el broker reinicia → Nginx 502 al usuario
+            max_block_ms=settings.KAFKA_PRODUCER_MAX_BLOCK_MS,
+            request_timeout_ms=30000,
         )
     
     def publish_events(self, events: List[BaseEvent]):

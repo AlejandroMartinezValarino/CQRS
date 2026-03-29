@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str = Field(default="localhost:9092", description="Servidores de Kafka")
     KAFKA_TOPIC_EVENTS: str = Field(default="anime-events", description="Topic para eventos")
     KAFKA_PRODUCER_RETRIES: int = Field(default=3, ge=0, description="Intentos de retry para producer")
+    KAFKA_PRODUCER_MAX_BLOCK_MS: int = Field(
+        default=15000, ge=1000, le=120000, description="Máx. espera al publicar si Kafka no responde (evita bloquear la API)"
+    )
     KAFKA_CONSUMER_GROUP_ID: str = Field(default="read-side-consumer-group", description="Group ID del consumer")
     KAFKA_CONSUMER_AUTO_OFFSET_RESET: str = Field(default="earliest", description="Auto offset reset")
     KAFKA_CONSUMER_ENABLE_AUTO_COMMIT: bool = Field(default=False, description="Auto commit de offsets")
