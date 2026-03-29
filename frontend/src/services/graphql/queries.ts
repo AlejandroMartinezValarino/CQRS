@@ -4,6 +4,8 @@ export const TOP_ANIMES_BY_VIEWS = gql`
   query TopAnimesByViews($limit: Int!) {
     topAnimesByViews(limit: $limit) {
       animeId
+      title
+      image
       totalClicks
       totalViews
       totalRatings
@@ -17,6 +19,8 @@ export const TOP_ANIMES_BY_RATING = gql`
   query TopAnimesByRating($limit: Int!) {
     topAnimesByRating(limit: $limit) {
       animeId
+      title
+      image
       totalClicks
       totalViews
       totalRatings

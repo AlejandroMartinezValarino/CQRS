@@ -16,6 +16,8 @@ export interface AnimeStats {
   totalRatings: number;
   averageRating?: number | null;
   totalDurationSeconds: number;
+  title?: string | null;
+  image?: string | null;
 }
 
 export interface TopAnime extends AnimeStats {

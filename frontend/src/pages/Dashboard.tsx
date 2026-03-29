@@ -5,6 +5,30 @@ import { Loading } from '@/components/common/Loading';
 import { formatNumber, formatDuration } from '@/utils';
 const columns = [
   {
+    title: '',
+    dataIndex: 'image',
+    key: 'image',
+    width: 64,
+    render: (url: string | null | undefined) =>
+      url ? (
+        <img
+          src={url}
+          alt=""
+          style={{ width: 48, height: 64, objectFit: 'cover', borderRadius: 4 }}
+        />
+      ) : (
+        <span style={{ color: '#999' }}>—</span>
+      ),
+  },
+  {
+    title: 'Título',
+    dataIndex: 'title',
+    key: 'title',
+    ellipsis: true,
+    render: (t: string | null | undefined, record: { animeId: number }) =>
+      t?.trim() || `Anime #${record.animeId}`,
+  },
+  {
     title: 'Anime ID',
     dataIndex: 'animeId',
     key: 'animeId',

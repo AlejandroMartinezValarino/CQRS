@@ -104,15 +104,18 @@ class ReadModelRepository:
             async with self._pool.acquire() as conn:
                 rows = await conn.fetch("""
                     SELECT 
-                        anime_id,
-                        total_clicks,
-                        total_views,
-                        total_ratings,
-                        average_rating,
-                        total_duration_seconds
-                    FROM anime_stats
-                    WHERE total_views > 0
-                    ORDER BY total_views DESC
+                        s.anime_id,
+                        s.total_clicks,
+                        s.total_views,
+                        s.total_ratings,
+                        s.average_rating,
+                        s.total_duration_seconds,
+                        a.title AS title,
+                        a.image AS image
+                    FROM anime_stats s
+                    LEFT JOIN animes a ON a.myanimelist_id = s.anime_id
+                    WHERE s.total_views > 0
+                    ORDER BY s.total_views DESC
                     LIMIT $1
                 """, limit)
                 logger.debug(f"Se obtuvieron {len(rows)} resultados")
@@ -147,16 +150,19 @@ class ReadModelRepository:
             async with self._pool.acquire() as conn:
                 rows = await conn.fetch("""
                     SELECT 
-                        anime_id,
-                        total_clicks,
-                        total_views,
-                        total_ratings,
-                        average_rating,
-                        total_duration_seconds
-                    FROM anime_stats
-                    WHERE average_rating > 0 
-                        AND total_ratings >= 5
-                    ORDER BY average_rating DESC, total_ratings DESC
+                        s.anime_id,
+                        s.total_clicks,
+                        s.total_views,
+                        s.total_ratings,
+                        s.average_rating,
+                        s.total_duration_seconds,
+                        a.title AS title,
+                        a.image AS image
+                    FROM anime_stats s
+                    LEFT JOIN animes a ON a.myanimelist_id = s.anime_id
+                    WHERE s.average_rating > 0 
+                        AND s.total_ratings >= 5
+                    ORDER BY s.average_rating DESC, s.total_ratings DESC
                     LIMIT $1
                 """, limit)
                 logger.debug(f"Se obtuvieron {len(rows)} resultados")

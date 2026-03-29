@@ -40,6 +40,8 @@ def _row_to_anime_stats(row: dict) -> "AnimeStats":
         total_ratings=row["total_ratings"] or 0,
         average_rating=float(row["average_rating"]) if row["average_rating"] else None,
         total_duration_seconds=row["total_duration_seconds"] or 0,
+        title=row.get("title"),
+        image=row.get("image"),
     )
 
 
@@ -78,6 +80,8 @@ class AnimeStats:
     total_ratings: int
     average_rating: Optional[float]
     total_duration_seconds: int
+    title: Optional[str] = None
+    image: Optional[str] = None
 
 
 @strawberry.type

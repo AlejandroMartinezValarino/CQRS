@@ -13,9 +13,14 @@ export const AnimeList = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const { data, loading } = useTopAnimesByViews(100);
 
-  const filteredData = data?.topAnimesByViews.filter((anime: AnimeStats) =>
-    anime.animeId.toString().includes(searchTerm)
-  ) || [];
+  const filteredData =
+    data?.topAnimesByViews.filter((anime: AnimeStats) => {
+      const q = searchTerm.trim().toLowerCase();
+      if (!q) return true;
+      if (anime.animeId.toString().includes(searchTerm.trim())) return true;
+      if (anime.title?.toLowerCase().includes(q)) return true;
+      return false;
+    }) || [];
 
   if (loading) {
     return <Loading />;
@@ -25,7 +30,7 @@ export const AnimeList = () => {
     <div style={{ padding: '24px' }}>
       <div style={{ marginBottom: '24px' }}>
         <Search
-          placeholder="Buscar por Anime ID"
+          placeholder="Buscar por ID o título"
           allowClear
           enterButton={<SearchOutlined />}
           size="large"
@@ -45,9 +50,21 @@ export const AnimeList = () => {
                 hoverable
                 onClick={() => navigate(`/animes/${anime.animeId}`)}
                 style={{ height: '100%' }}
+                cover={
+                  anime.image ? (
+                    <img
+                      alt=""
+                      src={anime.image}
+                      style={{ height: 220, objectFit: 'cover' }}
+                    />
+                  ) : undefined
+                }
               >
                 <div style={{ textAlign: 'center' }}>
-                  <h3>Anime #{anime.animeId}</h3>
+                  <h3 style={{ marginTop: 0 }}>
+                    {anime.title?.trim() || `Anime #${anime.animeId}`}
+                  </h3>
+                  <p style={{ color: '#888', fontSize: 12 }}>#{anime.animeId}</p>
                   <p><strong>Clicks:</strong> {anime.totalClicks}</p>
                   <p><strong>Views:</strong> {anime.totalViews}</p>
                   <p><strong>Ratings:</strong> {anime.totalRatings}</p>
