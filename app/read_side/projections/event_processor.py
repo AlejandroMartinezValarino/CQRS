@@ -16,6 +16,12 @@ class EventProcessingError(DomainException):
     pass
 
 
+def _normalize_event_occurred_at(event: Dict[str, Any]) -> None:
+    """El JSON en Kafka puede traer `timestamp` (dominio) y el procesador exige `occurred_at`."""
+    if event.get("occurred_at") in (None, "") and event.get("timestamp") is not None:
+        event["occurred_at"] = event["timestamp"]
+
+
 class EventProcessor:
     """Procesa eventos y actualiza las proyecciones con idempotencia y logging."""
     
@@ -95,6 +101,7 @@ class EventProcessor:
         event_type = event.get("event_type", "ClickRegistered")
         aggregate_id = event.get("aggregate_id")
         
+        _normalize_event_occurred_at(event)
         self._validate_event(event, ["anime_id", "user_id", "occurred_at", "event_id"])
         
         if await self._is_event_processed(event_id):
@@ -156,6 +163,7 @@ class EventProcessor:
         event_type = event.get("event_type", "ViewRegistered")
         aggregate_id = event.get("aggregate_id")
         
+        _normalize_event_occurred_at(event)
         self._validate_event(event, ["anime_id", "user_id", "duration_seconds", "occurred_at", "event_id"])
         
         if await self._is_event_processed(event_id):
@@ -223,6 +231,7 @@ class EventProcessor:
         event_type = event.get("event_type", "RatingGiven")
         aggregate_id = event.get("aggregate_id")
         
+        _normalize_event_occurred_at(event)
         self._validate_event(event, ["anime_id", "user_id", "rating", "occurred_at", "event_id"])
         
         if await self._is_event_processed(event_id):

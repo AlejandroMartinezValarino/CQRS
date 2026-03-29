@@ -70,7 +70,6 @@ class ReadModelRepository:
             return
         
         patterns = [
-            f"anime_stats:{anime_id}",
             f"anime:{anime_id}",
         ]
         
@@ -160,13 +159,8 @@ class ReadModelRepository:
             
             self._validate_anime_id(anime_id)
             
-            cache_key = self._get_cache_key("anime_stats", anime_id)
-            if self._cache:
-                cached = self._cache.get(cache_key)
-                if cached is not None:
-                    logger.debug(f"Cache HIT para anime_stats (anime_id={anime_id})")
-                    return cached
-            
+            # Sin caché: el consumer de Kafka actualiza el read model y no comparte proceso con GraphQL,
+            # así que invalidar caché aquí no funcionaría y verías totales viejos hasta el TTL.
             logger.debug(f"Obteniendo estadísticas del anime {anime_id}")
             async with self._pool.acquire() as conn:
                 row = await conn.fetchrow("""
@@ -174,12 +168,7 @@ class ReadModelRepository:
                     WHERE anime_id = $1
                 """, anime_id)
                 logger.debug(f"Se obtuvo la estadística del anime {anime_id}")
-                result = dict(row) if row else None
-                
-                if self._cache and result:
-                    self._cache.set(cache_key, result)
-                
-                return result
+                return dict(row) if row else None
         except ValueError as e:
             raise
         except Exception as e:

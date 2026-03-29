@@ -39,7 +39,10 @@ export function useAnimeVisitTracking(
     async (opts: { showToast: boolean; useKeepaliveFetch?: boolean }) => {
       if (flushedRef.current || !Number.isFinite(animeId) || animeId < 1) return;
       flushedRef.current = true;
-      const duration = Math.max(0, Math.floor((Date.now() - startRef.current) / 1000));
+      const elapsedMs = Date.now() - startRef.current;
+      // Cualquier estancia >0 ms cuenta al menos 1 s en el agregado (floor dejaba casi todo en 0).
+      const duration =
+        elapsedMs <= 0 ? 0 : Math.max(1, Math.ceil(elapsedMs / 1000));
       const userId = getAnonUserId();
       const body = {
         anime_id: animeId,

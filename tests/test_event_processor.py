@@ -185,6 +185,33 @@ async def test_process_click_event_success(event_processor, mock_pool):
 
 
 @pytest.mark.asyncio
+async def test_process_click_event_uses_timestamp_when_occurred_at_missing(
+    event_processor, mock_pool
+):
+    """Si el JSON solo trae `timestamp` (dominio), se copia a `occurred_at` antes de validar."""
+    pool, conn = mock_pool
+    event_processor._pool = pool
+    event_processor._is_event_processed = AsyncMock(return_value=False)
+    event_processor._mark_event_processed = AsyncMock()
+    mock_transaction = AsyncMock()
+    mock_transaction.__aenter__ = AsyncMock(return_value=mock_transaction)
+    mock_transaction.__aexit__ = AsyncMock(return_value=None)
+    conn.transaction = MagicMock(return_value=mock_transaction)
+    conn.execute = AsyncMock()
+    ts = datetime.utcnow()
+    event = {
+        "event_id": "click-ts",
+        "event_type": "ClickRegistered",
+        "aggregate_id": "anime_1",
+        "anime_id": 1,
+        "user_id": "user123",
+        "timestamp": ts,
+    }
+    await event_processor.process_click_event(event)
+    assert conn.execute.call_count == 2
+
+
+@pytest.mark.asyncio
 async def test_process_click_event_idempotency(event_processor):
     """Test que process_click_event no procesa eventos duplicados (idempotencia)."""
     event_processor._is_event_processed = AsyncMock(return_value=True)
