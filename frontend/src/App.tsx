@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import { ApolloProvider } from '@apollo/client';
 import { Layout, Menu } from 'antd';
@@ -8,7 +8,6 @@ import { Dashboard } from '@/pages/Dashboard';
 import { AnimeList } from '@/pages/AnimeList';
 import { AnimeDetail } from '@/pages/AnimeDetail';
 import { Interactions } from '@/pages/Interactions';
-import { useNavigate, useLocation } from 'react-router-dom';
 
 const { Header, Content, Sider } = Layout;
 

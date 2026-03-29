@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Input, Row, Col, Spin, Empty } from 'antd';
+import { Card, Input, Row, Col, Empty } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTopAnimesByViews } from '@/hooks/useGraphQL';

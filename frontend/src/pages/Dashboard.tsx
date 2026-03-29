@@ -1,4 +1,4 @@
-import { Row, Col, Card, Statistic, Table, Spin } from 'antd';
+import { Row, Col, Card, Statistic, Table } from 'antd';
 import { EyeOutlined, LikeOutlined, StarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useTopAnimesByViews, useTopAnimesByRating } from '@/hooks/useGraphQL';
 import { Loading } from '@/components/common/Loading';
