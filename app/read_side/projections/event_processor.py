@@ -22,6 +22,25 @@ def _normalize_event_occurred_at(event: Dict[str, Any]) -> None:
         event["occurred_at"] = event["timestamp"]
 
 
+def _parse_occurred_at(value: Any) -> datetime:
+    """Kafka/JSON deserializa fechas como str; asyncpg exige datetime."""
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            raise EventProcessingError("occurred_at vacío")
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        try:
+            return datetime.fromisoformat(s)
+        except ValueError as e:
+            raise EventProcessingError(f"occurred_at no es ISO válido: {value!r}") from e
+    raise EventProcessingError(
+        f"occurred_at debe ser datetime o str ISO, recibido: {type(value).__name__}"
+    )
+
+
 class EventProcessor:
     """Procesa eventos y actualiza las proyecciones con idempotencia y logging."""
     
@@ -111,7 +130,7 @@ class EventProcessor:
         try:
             anime_id = event["anime_id"]
             user_id = event["user_id"]
-            occurred_at = event["occurred_at"]
+            occurred_at = _parse_occurred_at(event["occurred_at"])
             
             async with self._pool.acquire() as conn:
                 async with conn.transaction():
@@ -174,7 +193,7 @@ class EventProcessor:
             anime_id = event["anime_id"]
             user_id = event["user_id"]
             duration_seconds = event["duration_seconds"]
-            occurred_at = event["occurred_at"]
+            occurred_at = _parse_occurred_at(event["occurred_at"])
             
             if duration_seconds < 0:
                 raise EventProcessingError(f"duration_seconds debe ser positivo, recibido: {duration_seconds}")
@@ -242,7 +261,7 @@ class EventProcessor:
             anime_id = event["anime_id"]
             user_id = event["user_id"]
             rating = float(event["rating"])
-            occurred_at = event["occurred_at"]
+            occurred_at = _parse_occurred_at(event["occurred_at"])
             
             if not (1.0 <= rating <= 10.0):
                 raise EventProcessingError(f"Rating debe estar entre 1.0 y 10.0, recibido: {rating}")
