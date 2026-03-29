@@ -2,9 +2,15 @@
 import asyncio
 import csv
 import json
+import sys
 from pathlib import Path
 from typing import Optional
+
 import asyncpg
+
+_project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_project_root))
+
 from config.settings import settings
 
 
