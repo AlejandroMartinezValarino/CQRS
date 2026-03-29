@@ -14,6 +14,14 @@ sys.path.insert(0, str(_project_root))
 from config.settings import settings
 
 
+def _configure_csv_for_large_fields() -> None:
+    """El límite por defecto de csv (128 KiB) falla con descripciones muy largas."""
+    try:
+        csv.field_size_limit(sys.maxsize)
+    except OverflowError:
+        csv.field_size_limit(10_000_000)
+
+
 async def create_table(conn: asyncpg.Connection):
     """Crea la tabla de animes si no existe."""
     await conn.execute("""
@@ -81,6 +89,7 @@ def parse_value(value: str, field_type: str) -> Optional[any]:
 
 async def load_csv_to_db(csv_path: Path, batch_size: int = 100):
     """Carga el CSV a PostgreSQL."""
+    _configure_csv_for_large_fields()
     conn = await asyncpg.connect(
         host=settings.POSTGRES_HOST,
         port=settings.POSTGRES_PORT,
