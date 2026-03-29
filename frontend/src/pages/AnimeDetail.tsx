@@ -35,9 +35,8 @@ export const AnimeDetail = () => {
           type="error"
           showIcon
           message="Error al cargar la ficha"
-          description={[animeError, statsError]
-            .filter(Boolean)
-            .map((e) => e.message)
+          description={[animeError?.message, statsError?.message]
+            .filter((m): m is string => Boolean(m))
             .join(' · ')}
         />
       </div>

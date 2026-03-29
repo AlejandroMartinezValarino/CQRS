@@ -84,9 +84,8 @@ export const Dashboard = () => {
   }
 
   if (viewsError || ratingError) {
-    const msg = [viewsError, ratingError]
-      .filter(Boolean)
-      .map((e) => e.message)
+    const msg = [viewsError?.message, ratingError?.message]
+      .filter((m): m is string => Boolean(m))
       .join(' · ');
     return (
       <div style={{ padding: '24px' }}>
