@@ -1,7 +1,12 @@
 """Tests para GraphQL Schema."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.read_side.graphql.schema import Query, get_repository
+from app.read_side.graphql.schema import (
+    Query,
+    get_repository,
+    _row_to_anime,
+    _row_to_anime_stats,
+)
 from app.read_side.infrastructure.repository import ReadModelRepository
 from app.read_side.graphql.exceptions import InvalidLimitError
 from common.exceptions import AnimeNotFoundError, GraphQLError
@@ -112,7 +117,7 @@ async def test_anime_success(query, mock_repository):
 
 
 @pytest.mark.asyncio
-async def test_row_to_anime_stats(query):
+async def test_row_to_anime_stats():
     """Test del helper _row_to_anime_stats."""
     row = {
         "anime_id": 1,
@@ -122,7 +127,7 @@ async def test_row_to_anime_stats(query):
         "average_rating": 8.5,
         "total_duration_seconds": 3600
     }
-    result = query._row_to_anime_stats(row)
+    result = _row_to_anime_stats(row)
     assert result.anime_id == 1
     assert result.total_clicks == 50
     assert result.total_views == 100
@@ -132,7 +137,7 @@ async def test_row_to_anime_stats(query):
 
 
 @pytest.mark.asyncio
-async def test_row_to_anime_stats_with_none_rating(query):
+async def test_row_to_anime_stats_with_none_rating():
     """Test del helper _row_to_anime_stats con rating None."""
     row = {
         "anime_id": 1,
@@ -142,12 +147,12 @@ async def test_row_to_anime_stats_with_none_rating(query):
         "average_rating": None,
         "total_duration_seconds": 3600
     }
-    result = query._row_to_anime_stats(row)
+    result = _row_to_anime_stats(row)
     assert result.average_rating is None
 
 
 @pytest.mark.asyncio
-async def test_row_to_anime(query):
+async def test_row_to_anime():
     """Test del helper _row_to_anime."""
     row = {
         "myanimelist_id": 1,
@@ -159,7 +164,7 @@ async def test_row_to_anime(query):
         "score": 8.5,
         "popularity": 100
     }
-    result = query._row_to_anime(row)
+    result = _row_to_anime(row)
     assert result.myanimelist_id == 1
     assert result.title == "Test Anime"
     assert result.description == "Test description"
