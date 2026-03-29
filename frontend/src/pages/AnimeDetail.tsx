@@ -16,10 +16,13 @@ export const AnimeDetail = () => {
 
   const anime = animeData?.anime;
   const stats = statsData?.animeStats;
-  const hasLoadedContent =
-    !animeLoading && !statsLoading && (!!anime || !!stats);
+  // No exigir !statsLoading si ya tenemos `anime`: al refetchear tras el click, statsLoading
+  // puede volver a true, el efecto de tracking hacía cleanup y reiniciaba el cronómetro (duración ~0).
+  const canTrackVisit =
+    !animeLoading &&
+    (!!anime || (!!stats && !statsLoading));
 
-  useAnimeVisitTracking(animeId, hasLoadedContent);
+  useAnimeVisitTracking(animeId, canTrackVisit);
 
   if (animeLoading || statsLoading) {
     return <Loading />;
