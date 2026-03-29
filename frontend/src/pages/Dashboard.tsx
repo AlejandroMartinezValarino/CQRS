@@ -1,4 +1,4 @@
-import { Row, Col, Card, Statistic, Table } from 'antd';
+import { Row, Col, Card, Statistic, Table, Alert } from 'antd';
 import { EyeOutlined, LikeOutlined, StarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useTopAnimesByViews, useTopAnimesByRating } from '@/hooks/useGraphQL';
 import { Loading } from '@/components/common/Loading';
@@ -66,8 +66,8 @@ const columns = [
 ];
 
 export const Dashboard = () => {
-  const { data: viewsData, loading: viewsLoading } = useTopAnimesByViews(10);
-  const { data: ratingData, loading: ratingLoading } = useTopAnimesByRating(10);
+  const { data: viewsData, loading: viewsLoading, error: viewsError } = useTopAnimesByViews(10);
+  const { data: ratingData, loading: ratingLoading, error: ratingError } = useTopAnimesByRating(10);
 
   const totalStats = viewsData?.topAnimesByViews.reduce(
     (acc, curr) => ({
@@ -83,8 +83,49 @@ export const Dashboard = () => {
     return <Loading />;
   }
 
+  if (viewsError || ratingError) {
+    const msg = [viewsError, ratingError]
+      .filter(Boolean)
+      .map((e) => e.message)
+      .join(' · ');
+    return (
+      <div style={{ padding: '24px' }}>
+        <Alert
+          type="error"
+          showIcon
+          message="No se pudo cargar el dashboard desde GraphQL"
+          description={
+            <>
+              <p>{msg}</p>
+              <p style={{ marginBottom: 0 }}>
+                Comprueba que el read-side responda (p. ej. <code>POST /graphql</code> vía el mismo origen
+                que la web), Nginx y CORS. En consola del navegador suele aparecer el detalle (502, red,
+                bloqueo).
+              </p>
+            </>
+          }
+        />
+      </div>
+    );
+  }
+
+  const viewsRows = viewsData?.topAnimesByViews ?? [];
+  const hasNoViewStats = viewsRows.length === 0;
+
   return (
     <div style={{ padding: '24px' }}>
+      {hasNoViewStats && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message="Aún no hay ranking por visualizaciones"
+          description={
+            'Solo se listan animes con total_views > 0. Ejecuta el seed de estadísticas o genera visitas; ' +
+            'las actualizaciones del consumer pueden tardar unos segundos.'
+          }
+        />
+      )}
       <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
         <Col xs={24} sm={12} md={6}>
           <Card>

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Input, Row, Col, Empty } from 'antd';
+import { Card, Input, Row, Col, Empty, Alert } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useTopAnimesByViews } from '@/hooks/useGraphQL';
@@ -11,7 +11,7 @@ const { Search } = Input;
 export const AnimeList = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const { data, loading } = useTopAnimesByViews(100);
+  const { data, loading, error } = useTopAnimesByViews(100);
 
   const filteredData =
     data?.topAnimesByViews.filter((anime: AnimeStats) => {
@@ -24,6 +24,19 @@ export const AnimeList = () => {
 
   if (loading) {
     return <Loading />;
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '24px' }}>
+        <Alert
+          type="error"
+          showIcon
+          message="No se pudo cargar el listado"
+          description={error.message}
+        />
+      </div>
+    );
   }
 
   return (
@@ -41,7 +54,13 @@ export const AnimeList = () => {
       </div>
 
       {filteredData.length === 0 ? (
-        <Empty description="No se encontraron animes" />
+        <Empty
+          description={
+            data?.topAnimesByViews?.length === 0
+              ? 'No hay animes con visualizaciones en el read model (total_views > 0). Usa el seed o visita fichas.'
+              : 'No se encontraron animes con ese criterio de búsqueda'
+          }
+        />
       ) : (
         <Row gutter={[16, 16]}>
           {filteredData.map((anime: AnimeStats) => (

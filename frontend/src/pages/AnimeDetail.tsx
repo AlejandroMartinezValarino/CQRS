@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Row, Col, Statistic, Button, Empty } from 'antd';
+import { Card, Row, Col, Statistic, Button, Empty, Alert } from 'antd';
 import { ArrowLeftOutlined, EyeOutlined, LikeOutlined, StarOutlined } from '@ant-design/icons';
 import { useAnime, useAnimeStats } from '@/hooks/useGraphQL';
 import { useAnimeVisitTracking } from '@/hooks/useAnimeVisitTracking';
@@ -11,8 +11,8 @@ export const AnimeDetail = () => {
   const navigate = useNavigate();
   const animeId = id ? parseInt(id, 10) : 0;
 
-  const { data: animeData, loading: animeLoading } = useAnime(animeId);
-  const { data: statsData, loading: statsLoading } = useAnimeStats(animeId);
+  const { data: animeData, loading: animeLoading, error: animeError } = useAnime(animeId);
+  const { data: statsData, loading: statsLoading, error: statsError } = useAnimeStats(animeId);
 
   const anime = animeData?.anime;
   const stats = statsData?.animeStats;
@@ -26,6 +26,22 @@ export const AnimeDetail = () => {
 
   if (animeLoading || statsLoading) {
     return <Loading />;
+  }
+
+  if (animeError || statsError) {
+    return (
+      <div style={{ padding: '24px' }}>
+        <Alert
+          type="error"
+          showIcon
+          message="Error al cargar la ficha"
+          description={[animeError, statsError]
+            .filter(Boolean)
+            .map((e) => e.message)
+            .join(' · ')}
+        />
+      </div>
+    );
   }
 
   if (!anime && !stats) {
