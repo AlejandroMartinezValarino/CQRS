@@ -39,6 +39,9 @@ class KafkaEventConsumer:
                 auto_commit_interval_ms=1000,
                 max_poll_records=10,
                 auto_offset_reset=settings.KAFKA_CONSUMER_AUTO_OFFSET_RESET,
+                session_timeout_ms=settings.KAFKA_CONSUMER_SESSION_TIMEOUT_MS,
+                heartbeat_interval_ms=settings.KAFKA_CONSUMER_HEARTBEAT_INTERVAL_MS,
+                max_poll_interval_ms=settings.KAFKA_CONSUMER_MAX_POLL_INTERVAL_MS,
             )
             
             await self.consumer.start()

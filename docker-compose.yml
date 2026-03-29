@@ -29,6 +29,8 @@ services:
   kafka:
     image: confluentinc/cp-kafka:7.6.2
     environment:
+      # Menos ruido en logs (evita TRACE/INFO masivo de LeaderAndIsr y GroupCoordinator)
+      KAFKA_LOG4J_ROOT_LOGLEVEL: WARN
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT

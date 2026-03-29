@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     KAFKA_CONSUMER_GROUP_ID: str = Field(default="read-side-consumer-group", description="Group ID del consumer")
     KAFKA_CONSUMER_AUTO_OFFSET_RESET: str = Field(default="earliest", description="Auto offset reset")
     KAFKA_CONSUMER_ENABLE_AUTO_COMMIT: bool = Field(default=False, description="Auto commit de offsets")
+    # Tolerar GC/red en VPS: conviene session_timeout_ms >= ~3 * heartbeat_interval_ms
+    KAFKA_CONSUMER_SESSION_TIMEOUT_MS: int = Field(
+        default=30000, ge=6000, le=180000, description="Session timeout del consumer (ms)"
+    )
+    KAFKA_CONSUMER_HEARTBEAT_INTERVAL_MS: int = Field(
+        default=3000, ge=1000, le=30000, description="Intervalo de heartbeat (ms)"
+    )
+    KAFKA_CONSUMER_MAX_POLL_INTERVAL_MS: int = Field(
+        default=300000, ge=10000, le=1800000, description="Máximo entre polls si el procesamiento es lento (ms)"
+    )
     
     # API - Command Side
     API_HOST: str = Field(default="0.0.0.0", description="Host del API")
