@@ -118,7 +118,8 @@ class ReadModelRepository:
                 logger.debug(f"Se obtuvieron {len(rows)} resultados")
                 results = [dict(row) for row in rows]
                 
-                if self._cache:
+                # No cachear listas vacías: tras poblar anime_stats el caché seguiría devolviendo [] hasta el TTL.
+                if self._cache and results:
                     self._cache.set(cache_key, results)
                 
                 return results
@@ -161,7 +162,7 @@ class ReadModelRepository:
                 logger.debug(f"Se obtuvieron {len(rows)} resultados")
                 results = [dict(row) for row in rows]
                 
-                if self._cache:
+                if self._cache and results:
                     self._cache.set(cache_key, results)
                 
                 return results
